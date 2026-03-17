@@ -1,0 +1,113 @@
+// Prisma schema for Stock Management & Production Planning
+// Database: SQLite (local-first)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../data/factory.db"
+}
+
+// ─── PARTS ───────────────────────────────────────────────────────────────────
+// Raw materials or components required to build products
+model Part {
+  id               Int     @id @default(autoincrement())
+  name             String  @unique
+  currentStock     Int     @default(0)   // units currently in warehouse
+  minimumStock     Int?                   // alert threshold (optional)
+  supplierLeadTime Int                    // days to receive from supplier
+  unit             String  @default("pcs") // pcs, kg, m, etc.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productParts   ProductPart[]
+  stockMovements StockMovement[]
+  orderParts     OrderPart[]
+}
+
+// ─── PRODUCTS ────────────────────────────────────────────────────────────────
+// Finished goods that are manufactured from parts
+model Product {
+  id             Int    @id @default(autoincrement())
+  name           String @unique
+  dailyCapacity  Int    // how many units of this product can be made per day
+  description    String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productParts ProductPart[]
+  orders       Order[]
+}
+
+// ─── BILL OF MATERIALS (BOM) ──────────────────────────────────────────────────
+// Stores the yield relationship between a material and a product.
+//
+// Examples:
+//   1 sheet of HPL  → makes 5 t700s  : materialQty=1, productsPerBatch=5
+//   4 black pins    → needed per t700 : materialQty=4, productsPerBatch=1
+//   1 box           → per t700        : materialQty=1, productsPerBatch=1
+//
+// Materials needed for an order = ceil(orderQty × materialQty / productsPerBatch)
+model ProductPart {
+  id               Int @id @default(autoincrement())
+  productId        Int
+  partId           Int
+  materialQty      Int @default(1) // units of material in this ratio
+  productsPerBatch Int @default(1) // how many products that amount of material makes
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  part    Part    @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, partId])
+}
+
+// ─── ORDERS ───────────────────────────────────────────────────────────────────
+// Customer/production orders
+model Order {
+  id                  Int       @id @default(autoincrement())
+  productId           Int
+  quantity            Int       // number of product units to manufacture
+  desiredDeadline     DateTime?  // when customer wants it (optional)
+  status              String    @default("planned") // planned | in_production | completed | cancelled
+  productionStartDate DateTime?  // calculated: when production can begin
+  productionEndDate   DateTime?  // calculated: start + productionTime
+  isOnTime            Boolean?   // whether end date meets deadline
+  notes               String    @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product    Product     @relation(fields: [productId], references: [id])
+  orderParts OrderPart[] // part breakdown for this order
+}
+
+// ─── ORDER PARTS ─────────────────────────────────────────────────────────────
+// Snapshot of part requirements when the order was placed
+model OrderPart {
+  id              Int       @id @default(autoincrement())
+  orderId         Int
+  partId          Int
+  quantityNeeded  Int       // total quantity required (part.quantityRequired × order.quantity)
+  quantityInStock Int       // how much was available at order time
+  quantityMissing Int       // shortage = max(0, needed - inStock)
+  availableDate   DateTime  // today if in stock, else today + supplierLeadTime
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  part  Part  @relation(fields: [partId], references: [id])
+}
+
+// ─── STOCK MOVEMENTS ─────────────────────────────────────────────────────────
+// Audit log of every stock change (incoming deliveries, production consumption)
+model StockMovement {
+  id        Int      @id @default(autoincrement())
+  partId    Int
+  quantity  Int      // positive = stock added, negative = stock consumed
+  reason    String   // "production_order_#N", "delivery", "manual_adjustment", etc.
+  createdAt DateTime @default(now())
+
+  part Part @relation(fields: [partId], references: [id])
+}

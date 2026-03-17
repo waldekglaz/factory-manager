@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# SQLite database and all related files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+backend/data/
+
+# Build output
+frontend/dist/
+
+# Environment variables
+.env
+.env.local
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+*.swp
