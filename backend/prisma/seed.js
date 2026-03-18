@@ -5,6 +5,7 @@
  * Products:   Electric Motor AC-3, Industrial Fan IF-600, Control Panel CP-12
  * Customers:  2 example customers
  * Suppliers:  2 example suppliers with parts linked
+ * Locations:  3 example storage locations with stock assigned
  *
  * Run:  node prisma/seed.js
  */
@@ -227,6 +228,118 @@ async function main() {
   ]);
 
   console.log("  Linked parts to suppliers");
+
+  // ── Locations ────────────────────────────────────────────────────────────────
+  const [locUnit1, locUnit3, locWarehouse] = await Promise.all([
+    prisma.location.upsert({
+      where:  { name: "Unit 1" },
+      update: {},
+      create: { name: "Unit 1", code: "U1", description: "Main production unit — shelving bays A–D", isActive: true },
+    }),
+    prisma.location.upsert({
+      where:  { name: "Unit 3" },
+      update: {},
+      create: { name: "Unit 3", code: "U3", description: "Secondary production unit — overflow stock", isActive: true },
+    }),
+    prisma.location.upsert({
+      where:  { name: "Warehouse" },
+      update: {},
+      create: { name: "Warehouse", code: "WH", description: "Finished goods and bulk raw materials", isActive: true },
+    }),
+  ]);
+
+  console.log(`  Created locations: ${locUnit1.name}, ${locUnit3.name}, ${locWarehouse.name}`);
+
+  // Assign part stock to locations (quantities must not exceed Part.currentStock)
+  // Unit 1 holds the bulk of day-to-day parts; Unit 3 holds overflow
+  await Promise.all([
+    // Steel Screw M6 — 300 in Unit 1, 200 in Warehouse
+    prisma.partLocationStock.upsert({
+      where:  { partId_locationId: { partId: p["Steel Screw M6"].id, locationId: locUnit1.id } },
+      update: {},
+      create: { partId: p["Steel Screw M6"].id, locationId: locUnit1.id, quantity: 300 },
+    }),
+    prisma.partLocationStock.upsert({
+      where:  { partId_locationId: { partId: p["Steel Screw M6"].id, locationId: locWarehouse.id } },
+      update: {},
+      create: { partId: p["Steel Screw M6"].id, locationId: locWarehouse.id, quantity: 200 },
+    }),
+
+    // Ball Bearing 6205 — 12 in Unit 1, 8 in Unit 3
+    prisma.partLocationStock.upsert({
+      where:  { partId_locationId: { partId: p["Ball Bearing 6205"].id, locationId: locUnit1.id } },
+      update: {},
+      create: { partId: p["Ball Bearing 6205"].id, locationId: locUnit1.id, quantity: 12 },
+    }),
+    prisma.partLocationStock.upsert({
+      where:  { partId_locationId: { partId: p["Ball Bearing 6205"].id, locationId: locUnit3.id } },
+      update: {},
+      create: { partId: p["Ball Bearing 6205"].id, locationId: locUnit3.id, quantity: 8 },
+    }),
+
+    // Motor Housing — all 5 in Unit 3 (large items)
+    prisma.partLocationStock.upsert({
+      where:  { partId_locationId: { partId: p["Motor Housing"].id, locationId: locUnit3.id } },
+      update: {},
+      create: { partId: p["Motor Housing"].id, locationId: locUnit3.id, quantity: 5 },
+    }),
+
+    // Copper Wire 1mm — 150 in Unit 1, 50 in Warehouse
+    prisma.partLocationStock.upsert({
+      where:  { partId_locationId: { partId: p["Copper Wire 1mm"].id, locationId: locUnit1.id } },
+      update: {},
+      create: { partId: p["Copper Wire 1mm"].id, locationId: locUnit1.id, quantity: 150 },
+    }),
+    prisma.partLocationStock.upsert({
+      where:  { partId_locationId: { partId: p["Copper Wire 1mm"].id, locationId: locWarehouse.id } },
+      update: {},
+      create: { partId: p["Copper Wire 1mm"].id, locationId: locWarehouse.id, quantity: 50 },
+    }),
+
+    // Control PCB — all 3 in Unit 1 (ESD-safe shelf)
+    prisma.partLocationStock.upsert({
+      where:  { partId_locationId: { partId: p["Control PCB"].id, locationId: locUnit1.id } },
+      update: {},
+      create: { partId: p["Control PCB"].id, locationId: locUnit1.id, quantity: 3 },
+    }),
+
+    // Fan Blade 300mm — all 8 in Unit 3
+    prisma.partLocationStock.upsert({
+      where:  { partId_locationId: { partId: p["Fan Blade 300mm"].id, locationId: locUnit3.id } },
+      update: {},
+      create: { partId: p["Fan Blade 300mm"].id, locationId: locUnit3.id, quantity: 8 },
+    }),
+
+    // Capacitor 100uF — 100 in Unit 1, 50 in Unit 3
+    prisma.partLocationStock.upsert({
+      where:  { partId_locationId: { partId: p["Capacitor 100uF"].id, locationId: locUnit1.id } },
+      update: {},
+      create: { partId: p["Capacitor 100uF"].id, locationId: locUnit1.id, quantity: 100 },
+    }),
+    prisma.partLocationStock.upsert({
+      where:  { partId_locationId: { partId: p["Capacitor 100uF"].id, locationId: locUnit3.id } },
+      update: {},
+      create: { partId: p["Capacitor 100uF"].id, locationId: locUnit3.id, quantity: 50 },
+    }),
+
+    // Rotor Core — all 4 in Unit 3 (heavy components)
+    prisma.partLocationStock.upsert({
+      where:  { partId_locationId: { partId: p["Rotor Core"].id, locationId: locUnit3.id } },
+      update: {},
+      create: { partId: p["Rotor Core"].id, locationId: locUnit3.id, quantity: 4 },
+    }),
+  ]);
+
+  console.log("  Assigned part stock to locations");
+
+  // Finished goods in Warehouse
+  await prisma.productLocationStock.upsert({
+    where:  { productId_locationId: { productId: motor.id, locationId: locWarehouse.id } },
+    update: {},
+    create: { productId: motor.id, locationId: locWarehouse.id, quantity: 2 },
+  });
+
+  console.log("  Assigned finished goods to Warehouse");
 
   // ── Stock movements (history) ────────────────────────────────────────────────
   await prisma.stockMovement.createMany({

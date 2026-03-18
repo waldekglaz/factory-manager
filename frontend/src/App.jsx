@@ -1,16 +1,18 @@
 import { Routes, Route, NavLink } from "react-router-dom";
-import Dashboard  from "./pages/Dashboard";
-import Parts      from "./pages/Parts";
-import Products   from "./pages/Products";
-import Orders     from "./pages/Orders";
-import Schedule   from "./pages/Schedule";
-import Customers  from "./pages/Customers";
+import Dashboard   from "./pages/Dashboard";
+import Parts       from "./pages/Parts";
+import Products    from "./pages/Products";
+import Orders      from "./pages/Orders";
+import Schedule    from "./pages/Schedule";
+import Customers   from "./pages/Customers";
 import Procurement from "./pages/Procurement";
+import Locations   from "./pages/Locations";
 
 const NAV = [
   { to: "/",            icon: "🏠", label: "Dashboard"           },
   { to: "/parts",       icon: "🔩", label: "Materials / Parts"   },
   { to: "/products",    icon: "📦", label: "Products"            },
+  { to: "/locations",   icon: "🏭", label: "Locations"           },
   { to: "/customers",   icon: "👥", label: "Customers"           },
   { to: "/orders",      icon: "📋", label: "Orders"              },
   { to: "/procurement", icon: "🚚", label: "Procurement"         },
@@ -49,6 +51,7 @@ export default function App() {
           <Route path="/customers"   element={<Customers />}   />
           <Route path="/orders"      element={<Orders />}      />
           <Route path="/procurement" element={<Procurement />} />
+          <Route path="/locations"   element={<Locations />}   />
           <Route path="/schedule"    element={<Schedule />}    />
         </Routes>
       </main>

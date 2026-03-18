@@ -184,6 +184,15 @@ export default function Parts() {
                         {p.currentStock} {p.unit}
                       </span>
                     </div>
+                    {p.locationStocks?.length > 0 && (
+                      <div style={{ fontSize: "11px", color: "#888", marginTop: "3px" }}>
+                        {p.locationStocks.map(ls => (
+                          <span key={ls.id} style={{ marginRight: "8px" }}>
+                            {ls.location.code ?? ls.location.name}: {ls.quantity}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </td>
                   <td className="muted">{p.minimumStock != null ? `${p.minimumStock} ${p.unit}` : "—"}</td>
                   <td>{p.supplierLeadTime}d</td>

@@ -20,8 +20,12 @@ router.get("/", async (req, res) => {
   const parts = await prisma.part.findMany({
     orderBy: { name: "asc" },
     include: {
-      // Include how many products use this part
       _count: { select: { productParts: true } },
+      locationStocks: {
+        where:   { quantity: { gt: 0 } },
+        include: { location: { select: { id: true, name: true, code: true } } },
+        orderBy: { quantity: "desc" },
+      },
     },
   });
   res.json(parts);

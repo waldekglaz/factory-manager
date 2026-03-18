@@ -27,6 +27,7 @@ model Part {
   orderParts         OrderPart[]
   supplierParts      SupplierPart[]
   purchaseOrderLines PurchaseOrderLine[]
+  locationStocks     PartLocationStock[]
 }
 
 // ─── PRODUCTS ────────────────────────────────────────────────────────────────
@@ -43,6 +44,7 @@ model Product {
   productParts           ProductPart[]
   orders                 Order[]
   finishedGoodsMovements FinishedGoodsMovement[]
+  locationStocks         ProductLocationStock[]
 }
 
 // ─── BILL OF MATERIALS (BOM) ──────────────────────────────────────────────────
@@ -117,26 +119,78 @@ model OrderPart {
   part  Part  @relation(fields: [partId], references: [id])
 }
 
+// ─── STORAGE LOCATIONS ────────────────────────────────────────────────────────
+// Physical places where materials and finished goods are stored.
+// e.g. "Unit 1", "Warehouse B - Shelf 3", "Cold Storage"
+model Location {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique  // full name shown in UI
+  code        String?          // short code e.g. "U1", "WH-B3"
+  description String  @default("")
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  partStocks             PartLocationStock[]
+  productStocks          ProductLocationStock[]
+  stockMovements         StockMovement[]
+  finishedGoodsMovements FinishedGoodsMovement[]
+}
+
+// ─── PART STOCK PER LOCATION ─────────────────────────────────────────────────
+// Tracks how many units of a part are stored in each location.
+// Sum of all rows for a partId = Part.currentStock (for location-assigned stock).
+// Any unassigned stock = Part.currentStock - sum(PartLocationStock for that part).
+model PartLocationStock {
+  id         Int @id @default(autoincrement())
+  partId     Int
+  locationId Int
+  quantity   Int @default(0)
+
+  part     Part     @relation(fields: [partId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([partId, locationId])
+}
+
+// ─── PRODUCT (FINISHED GOODS) STOCK PER LOCATION ─────────────────────────────
+model ProductLocationStock {
+  id         Int @id @default(autoincrement())
+  productId  Int
+  locationId Int
+  quantity   Int @default(0)
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, locationId])
+}
+
 // ─── STOCK MOVEMENTS ─────────────────────────────────────────────────────────
 model StockMovement {
-  id        Int      @id @default(autoincrement())
-  partId    Int
-  quantity  Int      // positive = added, negative = consumed
-  reason    String
-  createdAt DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  partId     Int
+  locationId Int?     // which location was affected (null = unassigned)
+  quantity   Int      // positive = added, negative = consumed
+  reason     String
+  createdAt  DateTime @default(now())
 
-  part Part @relation(fields: [partId], references: [id])
+  part     Part      @relation(fields: [partId], references: [id])
+  location Location? @relation(fields: [locationId], references: [id])
 }
 
 // ─── FINISHED GOODS MOVEMENTS ────────────────────────────────────────────────
 model FinishedGoodsMovement {
-  id        Int      @id @default(autoincrement())
-  productId Int
-  quantity  Int      // positive = added to stock, negative = reserved/shipped
-  reason    String
-  createdAt DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  productId  Int
+  locationId Int?     // which location was affected (null = unassigned)
+  quantity   Int      // positive = added to stock, negative = reserved/shipped
+  reason     String
+  createdAt  DateTime @default(now())
 
-  product Product @relation(fields: [productId], references: [id])
+  product  Product   @relation(fields: [productId], references: [id])
+  location Location? @relation(fields: [locationId], references: [id])
 }
 
 // ─── SUPPLIERS ────────────────────────────────────────────────────────────────

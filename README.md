@@ -6,6 +6,7 @@ A local-first Stock Management and Production Planning system for small manufact
 
 - **Materials & Stock** — track raw materials, stock levels, minimum thresholds, supplier lead times, and full movement audit log
 - **Products & BOM** — define products with a yield-based Bill of Materials and optional scrap/waste factor per material
+- **Storage Locations** — assign stock to named locations (Unit 1, Warehouse, etc.); see exactly what is stored where; transfer stock between locations
 - **Customers** — manage customer details and view their full order history
 - **Orders** — place orders with live production plan preview; stock is allocated immediately on creation
 - **Finished Goods Inventory** — track finished units in the warehouse; orders automatically fulfil from stock before scheduling production
@@ -49,7 +50,7 @@ npm install
 npx prisma migrate dev --name init   # creates the SQLite database
 ```
 
-Optionally load example data (8 materials, 3 products, 2 customers, 2 suppliers):
+Optionally load example data (8 materials, 3 products, 2 customers, 2 suppliers, 3 locations):
 
 ```bash
 node prisma/seed.js
@@ -89,6 +90,15 @@ When an order is placed, available stock is **immediately deducted** from the wa
 ### Finished goods
 
 If a product has units already in the warehouse (`finishedStock > 0`), the system fulfils as many as possible from stock before scheduling any production. The `finishedStock` is deducted at order creation and returned on cancellation.
+
+### Storage locations
+
+`Part.currentStock` is the planning total — it is what the production planner uses. Locations add a physical layer on top: `PartLocationStock` tracks how many units of a part are in each named location. The sum of all location quantities can be less than `currentStock`; the remainder is considered unassigned stock.
+
+Stock managers use the **Locations** page to:
+- Set up named locations (Unit 1, Warehouse B — Shelf 3, Cold Storage, etc.) with an optional short code
+- See the full stock breakdown per location (all parts and finished goods stored there)
+- Transfer stock between locations without affecting the planning totals
 
 ### Production planning algorithm
 
@@ -137,7 +147,7 @@ factory-manager/
 │   ├── prisma/
 │   │   ├── schema.prisma           # Full database schema
 │   │   ├── migrations/             # Migration history
-│   │   └── seed.js                 # Example data (materials, products, customers, suppliers)
+│   │   └── seed.js                 # Example data (materials, products, customers, suppliers, locations)
 │   ├── scripts/
 │   │   └── backup.js               # Database backup script
 │   └── src/
@@ -149,6 +159,7 @@ factory-manager/
 │       │   ├── orders.js           # Orders lifecycle + stock allocation
 │       │   ├── customers.js        # Customers CRUD + order history
 │       │   ├── procurement.js      # Suppliers, SupplierParts, PurchaseOrders + receive
+│       │   ├── locations.js        # Storage locations CRUD + stock view + transfers
 │       │   └── print.js            # HTML work order and delivery note
 │       └── services/
 │           └── productionPlanner.js  # Core planning algorithm
@@ -164,6 +175,7 @@ factory-manager/
             ├── Customers.jsx
             ├── Orders.jsx
             ├── Procurement.jsx
+            ├── Locations.jsx
             └── Schedule.jsx
 ```
 
@@ -179,8 +191,11 @@ factory-manager/
 | `Customer` | name, email, phone, address, notes |
 | `Order` | productId, customerId, quantity, status, productionStartDate, productionEndDate, fulfilledFromStock |
 | `OrderPart` | snapshot of part requirements at order creation |
-| `StockMovement` | partId, quantity (±), reason — full audit log |
-| `FinishedGoodsMovement` | productId, quantity (±), reason |
+| `Location` | name, code, description, isActive |
+| `PartLocationStock` | partId, locationId, quantity — units of a part stored at a location |
+| `ProductLocationStock` | productId, locationId, quantity — finished goods stored at a location |
+| `StockMovement` | partId, locationId?, quantity (±), reason — full audit log |
+| `FinishedGoodsMovement` | productId, locationId?, quantity (±), reason |
 | `Supplier` | name, email, phone, defaultLeadTime |
 | `SupplierPart` | supplierId, partId, unitCost, leadTimeOverride |
 | `PurchaseOrder` | supplierId, status, expectedDate |
@@ -229,7 +244,7 @@ The script keeps the 30 most recent backups and deletes older ones automatically
 ### Materials (Parts)
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/parts` | List all materials |
+| GET | `/api/parts` | List all materials (includes location stock breakdown) |
 | POST | `/api/parts` | Create material |
 | PUT | `/api/parts/:id` | Update material |
 | DELETE | `/api/parts/:id` | Delete material |
@@ -264,6 +279,17 @@ The script keeps the 30 most recent backups and deletes older ones automatically
 | POST | `/api/orders/:id/cancel` | Cancel (returns stock) |
 | GET | `/api/orders/:id/work-order` | Printable work order (HTML) |
 | GET | `/api/orders/:id/delivery-note` | Printable delivery note (HTML) |
+
+### Locations
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/locations` | List all locations with stock summary |
+| POST | `/api/locations` | Create location |
+| PUT | `/api/locations/:id` | Update location (name, code, description, isActive) |
+| DELETE | `/api/locations/:id` | Delete location (only if empty) |
+| GET | `/api/locations/:id/stock` | Full stock breakdown for one location |
+| POST | `/api/locations/transfer/parts` | Move part stock between locations |
+| POST | `/api/locations/transfer/products` | Move finished goods between locations |
 
 ### Procurement
 | Method | Endpoint | Description |

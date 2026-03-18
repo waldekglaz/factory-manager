@@ -78,4 +78,14 @@ export const api = {
     update:  (id, d)  => request("PUT",  `/purchase-orders/${id}`, d),
     receive: (id, d)  => request("POST", `/purchase-orders/${id}/receive`, d),
   },
+
+  locations: {
+    list:            ()           => request("GET",    "/locations"),
+    stock:           (id)         => request("GET",    `/locations/${id}/stock`),
+    create:          (data)       => request("POST",   "/locations", data),
+    update:          (id, d)      => request("PUT",    `/locations/${id}`, d),
+    delete:          (id)         => request("DELETE", `/locations/${id}`),
+    transferParts:   (data)       => request("POST",   "/locations/transfer/parts", data),
+    transferProducts:(data)       => request("POST",   "/locations/transfer/products", data),
+  },
 };

@@ -20,6 +20,7 @@ const ordersRouter      = require("./routes/orders");
 const customersRouter   = require("./routes/customers");
 const procurementRouter = require("./routes/procurement");
 const printRouter       = require("./routes/print");
+const locationsRouter   = require("./routes/locations");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -36,6 +37,7 @@ app.use("/api/orders",         ordersRouter);
 app.use("/api/customers",      customersRouter);
 app.use("/api",                procurementRouter); // mounts /api/suppliers and /api/purchase-orders
 app.use("/api/orders",         printRouter);       // mounts /api/orders/:id/work-order etc.
+app.use("/api/locations",      locationsRouter);
 
 // ── Health check ───────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
