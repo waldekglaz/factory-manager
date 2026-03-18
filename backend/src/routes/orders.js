@@ -26,7 +26,8 @@ const PRODUCT_WITH_BOM = {
     include: {
       part: {
         include: {
-          supplierParts: { include: { supplier: true } },
+          supplierParts:  { include: { supplier: true } },
+          locationStocks: { include: { location: true } },
         },
       },
     },

@@ -6,7 +6,7 @@ A local-first Stock Management and Production Planning system for small manufact
 
 - **Materials & Stock** — track raw materials, stock levels, minimum thresholds, supplier lead times, and full movement audit log
 - **Products & BOM** — define products with a yield-based Bill of Materials and optional scrap/waste factor per material
-- **Storage Locations** — assign stock to named locations (Unit 1, Warehouse, etc.); see exactly what is stored where; transfer stock between locations
+- **Storage Locations** — assign stock to named locations (Unit 1, Warehouse, etc.); mark locations as remote with a delivery time; the planner automatically factors in transit days for remote stock; transfer stock between locations
 - **Customers** — manage customer details and view their full order history
 - **Orders** — place orders with live production plan preview; stock is allocated immediately on creation
 - **Finished Goods Inventory** — track finished units in the warehouse; orders automatically fulfil from stock before scheduling production
@@ -50,7 +50,7 @@ npm install
 npx prisma migrate dev --name init   # creates the SQLite database
 ```
 
-Optionally load example data (8 materials, 3 products, 2 customers, 2 suppliers, 3 locations):
+Optionally load example data (8 materials, 3 products, 2 customers, 2 suppliers, 4 locations):
 
 ```bash
 node prisma/seed.js
@@ -93,12 +93,21 @@ If a product has units already in the warehouse (`finishedStock > 0`), the syste
 
 ### Storage locations
 
-`Part.currentStock` is the planning total — it is what the production planner uses. Locations add a physical layer on top: `PartLocationStock` tracks how many units of a part are in each named location. The sum of all location quantities can be less than `currentStock`; the remainder is considered unassigned stock.
+`Part.currentStock` is the planning total used by the production planner. Locations add a physical layer on top: `PartLocationStock` tracks how many units of a part are in each named location. Stock is entered through location assignments — the total is computed as the sum of all location quantities.
+
+A location can be marked **remote** with a delivery time in calendar days. This is used for stock held at a supplier's warehouse, a third-party logistics provider, or any off-site store. The planner splits local vs remote stock per part:
+
+| Stock available | Production start |
+|---|---|
+| Local stock covers the order | Today |
+| Need to pull from remote location(s) | Today + max delivery days of remote locations used |
+| Not enough stock anywhere | Today + supplier lead time |
 
 Stock managers use the **Locations** page to:
-- Set up named locations (Unit 1, Warehouse B — Shelf 3, Cold Storage, etc.) with an optional short code
+- Set up local or remote storage locations with an optional short code
+- Mark a location as remote and set its delivery time in days
 - See the full stock breakdown per location (all parts and finished goods stored there)
-- Transfer stock between locations without affecting the planning totals
+- Transfer stock between locations
 
 ### Production planning algorithm
 
@@ -107,8 +116,9 @@ For each material in the BOM:
 | Condition | Result |
 |---|---|
 | Finished goods ≥ order qty | No production needed — fulfilled from stock |
-| Stock ≥ needed | Available today |
-| Stock < needed | Available in `today + supplierLeadTime` days |
+| Local stock ≥ needed | Available today |
+| Total stock ≥ needed (some remote) | Available in `today + max(remote deliveryDays)` |
+| Total stock < needed | Available in `today + supplierLeadTime` |
 
 ```
 effectiveQty    = orderQty − fulfilledFromStock
@@ -191,7 +201,7 @@ factory-manager/
 | `Customer` | name, email, phone, address, notes |
 | `Order` | productId, customerId, quantity, status, productionStartDate, productionEndDate, fulfilledFromStock |
 | `OrderPart` | snapshot of part requirements at order creation |
-| `Location` | name, code, description, isActive |
+| `Location` | name, code, description, isActive, isRemote, deliveryDays |
 | `PartLocationStock` | partId, locationId, quantity — units of a part stored at a location |
 | `ProductLocationStock` | productId, locationId, quantity — finished goods stored at a location |
 | `StockMovement` | partId, locationId?, quantity (±), reason — full audit log |

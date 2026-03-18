@@ -1,11 +1,11 @@
 /**
  * Seed script — populates the database with realistic example data.
  *
- * Materials:  screws, bearings, motor housing, copper wire, PCB, fan blade, etc.
+ * Materials:  8 parts — stock defined entirely through location assignments
  * Products:   Electric Motor AC-3, Industrial Fan IF-600, Control Panel CP-12
  * Customers:  2 example customers
  * Suppliers:  2 example suppliers with parts linked
- * Locations:  3 example storage locations with stock assigned
+ * Locations:  4 storage locations (3 local + 1 remote supplier warehouse, 3-day delivery)
  *
  * Run:  node prisma/seed.js
  */
@@ -17,6 +17,15 @@ async function main() {
   console.log("Seeding database...");
 
   // ── Materials (Parts) ───────────────────────────────────────────────────────
+  // currentStock = sum of all location assignments defined below.
+  // U1: 300, WH: 200                   → 500 screws
+  // U1: 12,  U3: 8                     → 20  bearings
+  // U3: 2,   SupplierWH: 3 (remote)    → 5   housings
+  // U1: 150, WH: 50                    → 200 copper wire
+  // U1: 3                              → 3   PCBs
+  // U3: 8                              → 8   fan blades
+  // U1: 100, U3: 50                    → 150 capacitors
+  // U3: 1,   SupplierWH: 3 (remote)    → 4   rotor cores
   const parts = await Promise.all([
     prisma.part.upsert({
       where:  { name: "Steel Screw M6" },
@@ -230,30 +239,38 @@ async function main() {
   console.log("  Linked parts to suppliers");
 
   // ── Locations ────────────────────────────────────────────────────────────────
-  const [locUnit1, locUnit3, locWarehouse] = await Promise.all([
+  // 3 local locations + 1 remote supplier warehouse (3-day delivery).
+  // Remote stock counts toward Part.currentStock but the planner adds deliveryDays
+  // before treating it as available for production.
+  const [locUnit1, locUnit3, locWarehouse, locSupplierWH] = await Promise.all([
     prisma.location.upsert({
       where:  { name: "Unit 1" },
       update: {},
-      create: { name: "Unit 1", code: "U1", description: "Main production unit — shelving bays A–D", isActive: true },
+      create: { name: "Unit 1",             code: "U1",   description: "Main production unit — shelving bays A–D",          isActive: true, isRemote: false },
     }),
     prisma.location.upsert({
       where:  { name: "Unit 3" },
       update: {},
-      create: { name: "Unit 3", code: "U3", description: "Secondary production unit — overflow stock", isActive: true },
+      create: { name: "Unit 3",             code: "U3",   description: "Secondary production unit — overflow stock",         isActive: true, isRemote: false },
     }),
     prisma.location.upsert({
       where:  { name: "Warehouse" },
       update: {},
-      create: { name: "Warehouse", code: "WH", description: "Finished goods and bulk raw materials", isActive: true },
+      create: { name: "Warehouse",          code: "WH",   description: "Finished goods and bulk raw materials",              isActive: true, isRemote: false },
+    }),
+    prisma.location.upsert({
+      where:  { name: "Supplier Warehouse" },
+      update: {},
+      create: { name: "Supplier Warehouse", code: "SWH",  description: "PrecisionParts UK consignment stock — 3-day delivery", isActive: true, isRemote: true, deliveryDays: 3 },
     }),
   ]);
 
-  console.log(`  Created locations: ${locUnit1.name}, ${locUnit3.name}, ${locWarehouse.name}`);
+  console.log(`  Created locations: ${locUnit1.name}, ${locUnit3.name}, ${locWarehouse.name}, ${locSupplierWH.name} (remote)`);
 
-  // Assign part stock to locations (quantities must not exceed Part.currentStock)
-  // Unit 1 holds the bulk of day-to-day parts; Unit 3 holds overflow
+  // Assign part stock to locations.
+  // Local quantities are immediately available; remote quantities add deliveryDays to the plan.
   await Promise.all([
-    // Steel Screw M6 — 300 in Unit 1, 200 in Warehouse
+    // Steel Screw M6 — 300 in Unit 1, 200 in Warehouse (all local)
     prisma.partLocationStock.upsert({
       where:  { partId_locationId: { partId: p["Steel Screw M6"].id, locationId: locUnit1.id } },
       update: {},
@@ -265,7 +282,7 @@ async function main() {
       create: { partId: p["Steel Screw M6"].id, locationId: locWarehouse.id, quantity: 200 },
     }),
 
-    // Ball Bearing 6205 — 12 in Unit 1, 8 in Unit 3
+    // Ball Bearing 6205 — 12 in Unit 1, 8 in Unit 3 (all local)
     prisma.partLocationStock.upsert({
       where:  { partId_locationId: { partId: p["Ball Bearing 6205"].id, locationId: locUnit1.id } },
       update: {},
@@ -277,14 +294,19 @@ async function main() {
       create: { partId: p["Ball Bearing 6205"].id, locationId: locUnit3.id, quantity: 8 },
     }),
 
-    // Motor Housing — all 5 in Unit 3 (large items)
+    // Motor Housing — 2 in Unit 3 (local), 3 at Supplier Warehouse (remote, +3 days)
     prisma.partLocationStock.upsert({
       where:  { partId_locationId: { partId: p["Motor Housing"].id, locationId: locUnit3.id } },
       update: {},
-      create: { partId: p["Motor Housing"].id, locationId: locUnit3.id, quantity: 5 },
+      create: { partId: p["Motor Housing"].id, locationId: locUnit3.id, quantity: 2 },
+    }),
+    prisma.partLocationStock.upsert({
+      where:  { partId_locationId: { partId: p["Motor Housing"].id, locationId: locSupplierWH.id } },
+      update: {},
+      create: { partId: p["Motor Housing"].id, locationId: locSupplierWH.id, quantity: 3 },
     }),
 
-    // Copper Wire 1mm — 150 in Unit 1, 50 in Warehouse
+    // Copper Wire 1mm — 150 in Unit 1, 50 in Warehouse (all local)
     prisma.partLocationStock.upsert({
       where:  { partId_locationId: { partId: p["Copper Wire 1mm"].id, locationId: locUnit1.id } },
       update: {},
@@ -296,21 +318,21 @@ async function main() {
       create: { partId: p["Copper Wire 1mm"].id, locationId: locWarehouse.id, quantity: 50 },
     }),
 
-    // Control PCB — all 3 in Unit 1 (ESD-safe shelf)
+    // Control PCB — all 3 in Unit 1 (ESD-safe shelf, local)
     prisma.partLocationStock.upsert({
       where:  { partId_locationId: { partId: p["Control PCB"].id, locationId: locUnit1.id } },
       update: {},
       create: { partId: p["Control PCB"].id, locationId: locUnit1.id, quantity: 3 },
     }),
 
-    // Fan Blade 300mm — all 8 in Unit 3
+    // Fan Blade 300mm — all 8 in Unit 3 (local)
     prisma.partLocationStock.upsert({
       where:  { partId_locationId: { partId: p["Fan Blade 300mm"].id, locationId: locUnit3.id } },
       update: {},
       create: { partId: p["Fan Blade 300mm"].id, locationId: locUnit3.id, quantity: 8 },
     }),
 
-    // Capacitor 100uF — 100 in Unit 1, 50 in Unit 3
+    // Capacitor 100uF — 100 in Unit 1, 50 in Unit 3 (all local)
     prisma.partLocationStock.upsert({
       where:  { partId_locationId: { partId: p["Capacitor 100uF"].id, locationId: locUnit1.id } },
       update: {},
@@ -322,17 +344,22 @@ async function main() {
       create: { partId: p["Capacitor 100uF"].id, locationId: locUnit3.id, quantity: 50 },
     }),
 
-    // Rotor Core — all 4 in Unit 3 (heavy components)
+    // Rotor Core — 1 in Unit 3 (local), 3 at Supplier Warehouse (remote, +3 days)
     prisma.partLocationStock.upsert({
       where:  { partId_locationId: { partId: p["Rotor Core"].id, locationId: locUnit3.id } },
       update: {},
-      create: { partId: p["Rotor Core"].id, locationId: locUnit3.id, quantity: 4 },
+      create: { partId: p["Rotor Core"].id, locationId: locUnit3.id, quantity: 1 },
+    }),
+    prisma.partLocationStock.upsert({
+      where:  { partId_locationId: { partId: p["Rotor Core"].id, locationId: locSupplierWH.id } },
+      update: {},
+      create: { partId: p["Rotor Core"].id, locationId: locSupplierWH.id, quantity: 3 },
     }),
   ]);
 
   console.log("  Assigned part stock to locations");
 
-  // Finished goods in Warehouse
+  // Finished goods — 2 Electric Motors ready to ship in Warehouse
   await prisma.productLocationStock.upsert({
     where:  { productId_locationId: { productId: motor.id, locationId: locWarehouse.id } },
     update: {},

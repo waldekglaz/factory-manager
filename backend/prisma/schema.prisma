@@ -123,11 +123,13 @@ model OrderPart {
 // Physical places where materials and finished goods are stored.
 // e.g. "Unit 1", "Warehouse B - Shelf 3", "Cold Storage"
 model Location {
-  id          Int     @id @default(autoincrement())
-  name        String  @unique  // full name shown in UI
-  code        String?          // short code e.g. "U1", "WH-B3"
-  description String  @default("")
-  isActive    Boolean @default(true)
+  id           Int     @id @default(autoincrement())
+  name         String  @unique  // full name shown in UI
+  code         String?          // short code e.g. "U1", "WH-B3"
+  description  String  @default("")
+  isActive     Boolean @default(true)
+  isRemote     Boolean @default(false) // stock here needs transit time before it can be used
+  deliveryDays Int?                    // calendar days to receive stock from this location
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

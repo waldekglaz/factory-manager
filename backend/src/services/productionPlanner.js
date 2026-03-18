@@ -6,8 +6,10 @@
  *    If partial, only produce the shortfall.
  * 2. For each material in the BOM × effective production quantity:
  *    - Apply scrap factor: order slightly more to account for waste
- *    - If stock >= needed  → available TODAY
- *    - If stock < needed   → available in (today + supplierLeadTime) days
+ *    - If local stock >= needed  → available TODAY
+ *    - If total stock >= needed but some is in remote locations
+ *                                → available in (today + max remote deliveryDays)
+ *    - If total stock < needed   → available in (today + supplierLeadTime)
  *      Uses shortest lead time across all linked suppliers, falls back to part.supplierLeadTime
  * 3. productionStart = max(availableDate across all materials)
  * 4. productionDays  = ceil(productionQty / product.dailyCapacity)
@@ -105,9 +107,33 @@ function calculateProductionPlan(product, orderQty, desiredDeadline = null) {
       const quantityMissing = Math.max(0, quantityNeeded - part.currentStock);
       const isShortage      = quantityMissing > 0;
 
-      // Use shortest supplier lead time (or fallback to part.supplierLeadTime)
-      const leadTime      = getLeadTime(part);
-      const availableDate = isShortage ? addDays(baseDate, leadTime) : baseDate;
+      let availableDate;
+      if (isShortage) {
+        // Not enough stock anywhere — need to order from supplier
+        availableDate = addDays(baseDate, getLeadTime(part));
+      } else if (part.locationStocks && part.locationStocks.length > 0) {
+        // Enough total stock — check how much is local vs remote
+        const localStock = part.locationStocks
+          .filter((ls) => !ls.location?.isRemote)
+          .reduce((sum, ls) => sum + ls.quantity, 0);
+
+        if (localStock >= quantityNeeded) {
+          // All needed stock is on-site
+          availableDate = baseDate;
+        } else {
+          // Need to pull from remote location(s) — wait for the longest delivery time
+          const remoteWithStock = part.locationStocks.filter(
+            (ls) => ls.location?.isRemote && ls.quantity > 0
+          );
+          const maxDeliveryDays = remoteWithStock.length > 0
+            ? Math.max(...remoteWithStock.map((ls) => ls.location.deliveryDays ?? 0))
+            : 0;
+          availableDate = addDays(baseDate, maxDeliveryDays);
+        }
+      } else {
+        // No location data — treat all stock as local (legacy / unassigned)
+        availableDate = baseDate;
+      }
 
       partsBreakdown.push({
         partId:          part.id,

@@ -33,20 +33,42 @@ router.get("/", async (req, res) => {
 
 // ── Create a part ─────────────────────────────────────────────────────────────
 router.post("/", async (req, res) => {
-  const { name, currentStock, minimumStock, supplierLeadTime, unit } = req.body;
+  const { name, currentStock, minimumStock, supplierLeadTime, unit, locationStocks } = req.body;
 
   if (!name || supplierLeadTime == null) {
     return res.status(400).json({ error: "name and supplierLeadTime are required" });
   }
 
-  const part = await prisma.part.create({
-    data: {
-      name: name.trim(),
-      currentStock: currentStock != null ? Number(currentStock) : 0,
-      minimumStock: minimumStock != null && minimumStock !== "" ? Number(minimumStock) : null,
-      supplierLeadTime: Number(supplierLeadTime),
-      unit: unit ?? "pcs",
-    },
+  const part = await prisma.$transaction(async (tx) => {
+    const created = await tx.part.create({
+      data: {
+        name: name.trim(),
+        currentStock: currentStock != null ? Number(currentStock) : 0,
+        minimumStock: minimumStock != null && minimumStock !== "" ? Number(minimumStock) : null,
+        supplierLeadTime: Number(supplierLeadTime),
+        unit: unit ?? "pcs",
+      },
+    });
+
+    if (locationStocks && locationStocks.length > 0) {
+      await tx.partLocationStock.createMany({
+        data: locationStocks
+          .filter((ls) => Number(ls.quantity) > 0)
+          .map((ls) => ({
+            partId:     created.id,
+            locationId: Number(ls.locationId),
+            quantity:   Number(ls.quantity),
+          })),
+      });
+    }
+
+    return tx.part.findUnique({
+      where: { id: created.id },
+      include: {
+        _count: { select: { productParts: true } },
+        locationStocks: { include: { location: { select: { id: true, name: true, code: true } } } },
+      },
+    });
   });
 
   res.status(201).json(part);
@@ -55,17 +77,46 @@ router.post("/", async (req, res) => {
 // ── Update a part ─────────────────────────────────────────────────────────────
 router.put("/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const { name, currentStock, minimumStock, supplierLeadTime, unit } = req.body;
+  const { name, currentStock, minimumStock, supplierLeadTime, unit, locationStocks } = req.body;
 
-  const part = await prisma.part.update({
-    where: { id },
-    data: {
-      ...(name != null && { name: name.trim() }),
-      ...(currentStock != null && { currentStock: Number(currentStock) }),
-      ...(minimumStock !== undefined && { minimumStock: minimumStock !== "" ? Number(minimumStock) : null }),
-      ...(supplierLeadTime != null && { supplierLeadTime: Number(supplierLeadTime) }),
-      ...(unit != null && { unit }),
-    },
+  const part = await prisma.$transaction(async (tx) => {
+    const updated = await tx.part.update({
+      where: { id },
+      data: {
+        ...(name != null && { name: name.trim() }),
+        ...(currentStock != null && { currentStock: Number(currentStock) }),
+        ...(minimumStock !== undefined && { minimumStock: minimumStock !== "" ? Number(minimumStock) : null }),
+        ...(supplierLeadTime != null && { supplierLeadTime: Number(supplierLeadTime) }),
+        ...(unit != null && { unit }),
+      },
+    });
+
+    // If locationStocks provided, replace all location assignments
+    if (locationStocks !== undefined) {
+      await tx.partLocationStock.deleteMany({ where: { partId: id } });
+      const rows = locationStocks.filter((ls) => Number(ls.quantity) > 0);
+      if (rows.length > 0) {
+        await tx.partLocationStock.createMany({
+          data: rows.map((ls) => ({
+            partId:     id,
+            locationId: Number(ls.locationId),
+            quantity:   Number(ls.quantity),
+          })),
+        });
+      }
+    }
+
+    return tx.part.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { productParts: true } },
+        locationStocks: {
+          where:   { quantity: { gt: 0 } },
+          include: { location: { select: { id: true, name: true, code: true } } },
+          orderBy: { quantity: "desc" },
+        },
+      },
+    });
   });
 
   res.json(part);

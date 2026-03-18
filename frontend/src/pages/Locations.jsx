@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-const EMPTY_FORM = { name: "", code: "", description: "" };
+const EMPTY_FORM = { name: "", code: "", description: "", isRemote: false, deliveryDays: "" };
 
 export default function Locations() {
   const [locations, setLocations]       = useState([]);
@@ -73,7 +73,13 @@ export default function Locations() {
   function openEdit(loc, e) {
     e.stopPropagation();
     setEditingId(loc.id);
-    setForm({ name: loc.name, code: loc.code ?? "", description: loc.description ?? "" });
+    setForm({
+      name:         loc.name,
+      code:         loc.code         ?? "",
+      description:  loc.description  ?? "",
+      isRemote:     loc.isRemote     ?? false,
+      deliveryDays: loc.deliveryDays != null ? String(loc.deliveryDays) : "",
+    });
     setFormError("");
     setShowForm(true);
   }
@@ -84,10 +90,15 @@ export default function Locations() {
     setFormLoading(true);
     setFormError("");
     try {
+      const payload = {
+        ...form,
+        isRemote:     form.isRemote,
+        deliveryDays: form.isRemote && form.deliveryDays !== "" ? Number(form.deliveryDays) : null,
+      };
       if (editingId) {
-        await api.locations.update(editingId, form);
+        await api.locations.update(editingId, payload);
       } else {
-        await api.locations.create(form);
+        await api.locations.create(payload);
       }
       setShowForm(false);
       await load();
@@ -239,7 +250,12 @@ export default function Locations() {
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                           <strong style={{ fontSize: "1rem" }}>{loc.name}</strong>
                           {loc.code && <span className="badge badge-planned">{loc.code}</span>}
-                          {!loc.isActive && <span className="badge badge-warning">Inactive</span>}
+                          {loc.isRemote && (
+                            <span className="badge badge-warning">
+                              Remote{loc.deliveryDays ? ` · ${loc.deliveryDays}d` : ""}
+                            </span>
+                          )}
+                          {!loc.isActive && <span className="badge badge-cancelled">Inactive</span>}
                         </div>
                         {loc.description && (
                           <p style={{ margin: "0.25rem 0 0", fontSize: "0.8rem", color: "var(--muted)" }}>{loc.description}</p>
@@ -288,7 +304,14 @@ export default function Locations() {
           {!stockLoading && selected && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                <h2 style={{ margin: 0 }}>{selected.location.name}</h2>
+                <div>
+                  <h2 style={{ margin: 0 }}>{selected.location.name}</h2>
+                  {selected.location.isRemote && (
+                    <span style={{ fontSize: 12, color: "#b45309" }}>
+                      Remote location · {selected.location.deliveryDays ?? 0} day delivery
+                    </span>
+                  )}
+                </div>
                 <button className="btn btn-secondary" onClick={openTransfer}>Transfer Stock</button>
               </div>
 
@@ -380,7 +403,7 @@ export default function Locations() {
                   style={{ width: "100%" }}
                 />
               </div>
-              <div className="field" style={{ marginBottom: 16 }}>
+              <div className="field" style={{ marginBottom: 12 }}>
                 <label>Description</label>
                 <input
                   className="input"
@@ -390,6 +413,33 @@ export default function Locations() {
                   style={{ width: "100%" }}
                 />
               </div>
+              <div className="field" style={{ marginBottom: form.isRemote ? 12 : 16 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={form.isRemote}
+                    onChange={e => setForm(f => ({ ...f, isRemote: e.target.checked, deliveryDays: e.target.checked ? f.deliveryDays : "" }))}
+                  />
+                  Remote location <span style={{ color: "#888", fontWeight: 400 }}>(stock needs transit time before use)</span>
+                </label>
+              </div>
+              {form.isRemote && (
+                <div className="field" style={{ marginBottom: 16 }}>
+                  <label>Delivery time (calendar days) *</label>
+                  <input
+                    type="number" min="1" step="1"
+                    className="input"
+                    value={form.deliveryDays}
+                    onChange={e => setForm(f => ({ ...f, deliveryDays: e.target.value }))}
+                    placeholder="e.g. 3"
+                    required={form.isRemote}
+                    style={{ width: "100%" }}
+                  />
+                  <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+                    The planner will add this many days before stock from this location is available for production.
+                  </div>
+                </div>
+              )}
               <div className="gap-2">
                 <button type="submit" className="btn btn-primary" disabled={formLoading}>
                   {formLoading ? "Saving…" : editingId ? "Save Changes" : "Create Location"}

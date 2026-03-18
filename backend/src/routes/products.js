@@ -20,8 +20,11 @@ router.get("/", async (req, res) => {
   const products = await prisma.product.findMany({
     orderBy: { name: "asc" },
     include: {
-      productParts: {
-        include: { part: true }, // embed full part data in BOM rows
+      productParts: { include: { part: true } },
+      locationStocks: {
+        where:   { quantity: { gt: 0 } },
+        include: { location: { select: { id: true, name: true, code: true } } },
+        orderBy: { quantity: "desc" },
       },
     },
   });
@@ -44,7 +47,7 @@ router.get("/:id", async (req, res) => {
 
 // ── Create product + BOM ──────────────────────────────────────────────────────
 router.post("/", async (req, res) => {
-  const { name, dailyCapacity, description, finishedStock, parts } = req.body;
+  const { name, dailyCapacity, description, finishedStock, parts, locationStocks } = req.body;
   // parts = [{ partId, materialQty, productsPerBatch, scrapFactor }, ...]
 
   if (!name || dailyCapacity == null) {
@@ -54,24 +57,40 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "At least one part is required in BOM" });
   }
 
-  const product = await prisma.product.create({
-    data: {
-      name:          name.trim(),
-      dailyCapacity: Number(dailyCapacity),
-      description:   description   ?? "",
-      finishedStock: Number(finishedStock ?? 0),
-      productParts: {
-        create: parts.map((p) => ({
-          partId:          Number(p.partId),
-          materialQty:     Number(p.materialQty),
-          productsPerBatch: Number(p.productsPerBatch),
-          scrapFactor:     Number(p.scrapFactor ?? 0),
-        })),
+  const product = await prisma.$transaction(async (tx) => {
+    const created = await tx.product.create({
+      data: {
+        name:          name.trim(),
+        dailyCapacity: Number(dailyCapacity),
+        description:   description ?? "",
+        finishedStock: Number(finishedStock ?? 0),
+        productParts: {
+          create: parts.map((p) => ({
+            partId:           Number(p.partId),
+            materialQty:      Number(p.materialQty),
+            productsPerBatch: Number(p.productsPerBatch),
+            scrapFactor:      Number(p.scrapFactor ?? 0),
+          })),
+        },
       },
-    },
-    include: {
-      productParts: { include: { part: true } },
-    },
+    });
+
+    if (locationStocks && locationStocks.length > 0) {
+      await tx.productLocationStock.createMany({
+        data: locationStocks
+          .filter((ls) => Number(ls.quantity) > 0)
+          .map((ls) => ({
+            productId:  created.id,
+            locationId: Number(ls.locationId),
+            quantity:   Number(ls.quantity),
+          })),
+      });
+    }
+
+    return tx.product.findUnique({
+      where:   { id: created.id },
+      include: { productParts: { include: { part: true } }, locationStocks: { include: { location: { select: { id: true, name: true, code: true } } } } },
+    });
   });
 
   res.status(201).json(product);
@@ -80,11 +99,11 @@ router.post("/", async (req, res) => {
 // ── Update product + replace BOM ──────────────────────────────────────────────
 router.put("/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const { name, dailyCapacity, description, finishedStock, parts } = req.body;
+  const { name, dailyCapacity, description, finishedStock, parts, locationStocks } = req.body;
 
   // Use a transaction so BOM replacement is atomic
   const product = await prisma.$transaction(async (tx) => {
-    const updated = await tx.product.update({
+    await tx.product.update({
       where: { id },
       data: {
         ...(name          != null && { name: name.trim() }),
@@ -108,9 +127,27 @@ router.put("/:id", async (req, res) => {
       });
     }
 
+    // If locationStocks provided, replace all location assignments
+    if (locationStocks !== undefined) {
+      await tx.productLocationStock.deleteMany({ where: { productId: id } });
+      const rows = locationStocks.filter((ls) => Number(ls.quantity) > 0);
+      if (rows.length > 0) {
+        await tx.productLocationStock.createMany({
+          data: rows.map((ls) => ({
+            productId:  id,
+            locationId: Number(ls.locationId),
+            quantity:   Number(ls.quantity),
+          })),
+        });
+      }
+    }
+
     return tx.product.findUnique({
-      where: { id },
-      include: { productParts: { include: { part: true } } },
+      where:   { id },
+      include: {
+        productParts:  { include: { part: true } },
+        locationStocks: { include: { location: { select: { id: true, name: true, code: true } } } },
+      },
     });
   });
 

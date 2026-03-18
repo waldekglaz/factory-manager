@@ -8,20 +8,22 @@ import { useState, useEffect } from "react";
 import { api } from "../api";
 
 export default function Parts() {
-  const [parts, setParts]       = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [editing, setEditing]   = useState(null); // part object or null
-  const [showForm, setShowForm] = useState(false);
-  const [error, setError]       = useState("");
-  const [success, setSuccess]   = useState("");
+  const [parts, setParts]         = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [editing, setEditing]     = useState(null); // part object or null
+  const [showForm, setShowForm]   = useState(false);
+  const [error, setError]         = useState("");
+  const [success, setSuccess]     = useState("");
 
-  const blank = { name: "", currentStock: 0, minimumStock: "", supplierLeadTime: 7, unit: "pcs" };
+  const blank = { name: "", minimumStock: "", supplierLeadTime: 7, unit: "pcs", locationStocks: [] };
   const [form, setForm] = useState(blank);
 
   const load = async () => {
     try {
-      const data = await api.parts.list();
+      const [data, locs] = await Promise.all([api.parts.list(), api.locations.list()]);
       setParts(data);
+      setLocations(locs.filter(l => l.isActive));
     } finally {
       setLoading(false);
     }
@@ -33,26 +35,49 @@ export default function Parts() {
   const openEdit   = (p)  => {
     setForm({
       name: p.name,
-      currentStock: p.currentStock,
       minimumStock: p.minimumStock ?? "",
       supplierLeadTime: p.supplierLeadTime,
       unit: p.unit,
+      locationStocks: (p.locationStocks ?? []).map(ls => ({
+        locationId: ls.locationId ?? ls.location?.id,
+        quantity:   ls.quantity,
+      })),
     });
     setEditing(p);
     setShowForm(true);
     setError("");
   };
+
+  // ── location stock helpers ─────────────────────────────────────────────────
+  const addLocationRow = () => {
+    const used = new Set(form.locationStocks.map(ls => Number(ls.locationId)));
+    const free = locations.find(l => !used.has(l.id));
+    if (!free) return;
+    setForm(f => ({ ...f, locationStocks: [...f.locationStocks, { locationId: free.id, quantity: 0 }] }));
+  };
+  const removeLocationRow = (idx) =>
+    setForm(f => ({ ...f, locationStocks: f.locationStocks.filter((_, i) => i !== idx) }));
+  const updateLocationRow = (idx, field, val) =>
+    setForm(f => ({
+      ...f,
+      locationStocks: f.locationStocks.map((r, i) => i === idx ? { ...r, [field]: val } : r),
+    }));
   const closeForm = () => { setShowForm(false); setEditing(null); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     try {
+      const locationStocks = form.locationStocks
+        .map(ls => ({ locationId: Number(ls.locationId), quantity: Number(ls.quantity) }))
+        .filter(ls => ls.quantity > 0);
+      const currentStock = locationStocks.reduce((sum, ls) => sum + ls.quantity, 0);
+      const payload = { ...form, currentStock, locationStocks };
       if (editing) {
-        await api.parts.update(editing.id, form);
+        await api.parts.update(editing.id, payload);
         setSuccess("Part updated");
       } else {
-        await api.parts.create(form);
+        await api.parts.create(payload);
         setSuccess("Part created");
       }
       closeForm();
@@ -132,18 +157,66 @@ export default function Parts() {
             </div>
             <div className="form-row">
               <div className="field">
-                <label>Current Stock</label>
-                <input type="number" min="0" value={form.currentStock} onChange={(e) => setForm({ ...form, currentStock: e.target.value })} />
-              </div>
-              <div className="field">
                 <label>Minimum Stock (alert threshold)</label>
                 <input type="number" min="0" value={form.minimumStock} onChange={(e) => setForm({ ...form, minimumStock: e.target.value })} placeholder="optional" />
               </div>
+              <div className="field" style={{ maxWidth: 260 }}>
+                <label>Supplier Lead Time (days) *</label>
+                <input required type="number" min="1" value={form.supplierLeadTime} onChange={(e) => setForm({ ...form, supplierLeadTime: e.target.value })} />
+              </div>
             </div>
-            <div className="field" style={{ maxWidth: 260 }}>
-              <label>Supplier Lead Time (days) *</label>
-              <input required type="number" min="1" value={form.supplierLeadTime} onChange={(e) => setForm({ ...form, supplierLeadTime: e.target.value })} />
+
+            {/* ── Stock by location ── */}
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4, display: "flex", alignItems: "center", gap: 12 }}>
+                Stock by Location
+                {form.locationStocks.length > 0 && (
+                  <span style={{ fontWeight: 400, fontSize: 13, color: "var(--muted)" }}>
+                    Total: <strong style={{ color: "inherit" }}>
+                      {form.locationStocks.reduce((s, ls) => s + (Number(ls.quantity) || 0), 0)} {form.unit}
+                    </strong>
+                  </span>
+                )}
+              </div>
+              {locations.length === 0 ? (
+                <p className="muted" style={{ fontSize: 13 }}>No locations set up yet. Go to Locations to create storage locations first.</p>
+              ) : (
+                <>
+                  {form.locationStocks.length > 0 && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 120px auto", gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Location</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Quantity</span>
+                      <span />
+                    </div>
+                  )}
+                  {form.locationStocks.map((row, idx) => (
+                    <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 120px auto", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                      <select
+                        value={row.locationId}
+                        onChange={(e) => updateLocationRow(idx, "locationId", e.target.value)}
+                      >
+                        {locations.map(l => (
+                          <option key={l.id} value={l.id}>{l.name}{l.code ? ` (${l.code})` : ""}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="number" min="0"
+                        value={row.quantity}
+                        onChange={(e) => updateLocationRow(idx, "quantity", e.target.value)}
+                      />
+                      <button type="button" className="btn btn-danger btn-sm" onClick={() => removeLocationRow(idx)}>✕</button>
+                    </div>
+                  ))}
+                  {form.locationStocks.length < locations.length && (
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={addLocationRow}>+ Add Location</button>
+                  )}
+                  {form.locationStocks.length === 0 && (
+                    <p className="muted" style={{ fontSize: 13 }}>No stock assigned. Click "Add Location" to assign stock to a location.</p>
+                  )}
+                </>
+              )}
             </div>
+
             <div className="gap-2">
               <button type="submit" className="btn btn-primary">{editing ? "Save Changes" : "Create Part"}</button>
               <button type="button" className="btn btn-ghost" onClick={closeForm}>Cancel</button>

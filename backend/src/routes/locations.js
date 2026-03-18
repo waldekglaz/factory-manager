@@ -74,7 +74,7 @@ router.get("/:id/stock", async (req, res) => {
 
 // ── Create location ───────────────────────────────────────────────────────────
 router.post("/", async (req, res) => {
-  const { name, code, description } = req.body;
+  const { name, code, description, isRemote, deliveryDays } = req.body;
   if (!name) return res.status(400).json({ error: "name is required" });
 
   const location = await prisma.location.create({
@@ -82,6 +82,8 @@ router.post("/", async (req, res) => {
       name:        name.trim(),
       code:        code        ? code.trim()        : null,
       description: description ? description.trim() : "",
+      isRemote:    isRemote    ? Boolean(isRemote)  : false,
+      deliveryDays: isRemote && deliveryDays != null ? Number(deliveryDays) : null,
     },
   });
   res.status(201).json(location);
@@ -90,15 +92,19 @@ router.post("/", async (req, res) => {
 // ── Update location ───────────────────────────────────────────────────────────
 router.put("/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const { name, code, description, isActive } = req.body;
+  const { name, code, description, isActive, isRemote, deliveryDays } = req.body;
 
   const location = await prisma.location.update({
     where: { id },
     data: {
-      ...(name        != null && { name:        name.trim() }),
-      ...(code        !== undefined && { code:  code ? code.trim() : null }),
-      ...(description != null && { description }),
-      ...(isActive    != null && { isActive }),
+      ...(name        != null     && { name:        name.trim() }),
+      ...(code        !== undefined && { code:      code ? code.trim() : null }),
+      ...(description != null     && { description }),
+      ...(isActive    != null     && { isActive }),
+      ...(isRemote    != null     && { isRemote:    Boolean(isRemote) }),
+      ...(deliveryDays !== undefined && {
+        deliveryDays: deliveryDays != null ? Number(deliveryDays) : null,
+      }),
     },
   });
   res.json(location);
