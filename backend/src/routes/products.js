@@ -44,8 +44,8 @@ router.get("/:id", async (req, res) => {
 
 // ── Create product + BOM ──────────────────────────────────────────────────────
 router.post("/", async (req, res) => {
-  const { name, dailyCapacity, description, parts } = req.body;
-  // parts = [{ partId, materialQty, productsPerBatch }, ...]
+  const { name, dailyCapacity, description, finishedStock, parts } = req.body;
+  // parts = [{ partId, materialQty, productsPerBatch, scrapFactor }, ...]
 
   if (!name || dailyCapacity == null) {
     return res.status(400).json({ error: "name and dailyCapacity are required" });
@@ -56,14 +56,16 @@ router.post("/", async (req, res) => {
 
   const product = await prisma.product.create({
     data: {
-      name: name.trim(),
+      name:          name.trim(),
       dailyCapacity: Number(dailyCapacity),
-      description: description ?? "",
+      description:   description   ?? "",
+      finishedStock: Number(finishedStock ?? 0),
       productParts: {
         create: parts.map((p) => ({
-          partId: Number(p.partId),
-          materialQty: Number(p.materialQty),
+          partId:          Number(p.partId),
+          materialQty:     Number(p.materialQty),
           productsPerBatch: Number(p.productsPerBatch),
+          scrapFactor:     Number(p.scrapFactor ?? 0),
         })),
       },
     },
@@ -78,16 +80,17 @@ router.post("/", async (req, res) => {
 // ── Update product + replace BOM ──────────────────────────────────────────────
 router.put("/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const { name, dailyCapacity, description, parts } = req.body;
+  const { name, dailyCapacity, description, finishedStock, parts } = req.body;
 
   // Use a transaction so BOM replacement is atomic
   const product = await prisma.$transaction(async (tx) => {
     const updated = await tx.product.update({
       where: { id },
       data: {
-        ...(name != null && { name: name.trim() }),
+        ...(name          != null && { name: name.trim() }),
         ...(dailyCapacity != null && { dailyCapacity: Number(dailyCapacity) }),
-        ...(description != null && { description }),
+        ...(description   != null && { description }),
+        ...(finishedStock != null && { finishedStock: Number(finishedStock) }),
       },
     });
 
@@ -96,10 +99,11 @@ router.put("/:id", async (req, res) => {
       await tx.productPart.deleteMany({ where: { productId: id } });
       await tx.productPart.createMany({
         data: parts.map((p) => ({
-          productId: id,
-          partId: Number(p.partId),
-          materialQty: Number(p.materialQty),
+          productId:        id,
+          partId:           Number(p.partId),
+          materialQty:      Number(p.materialQty),
           productsPerBatch: Number(p.productsPerBatch),
+          scrapFactor:      Number(p.scrapFactor ?? 0),
         })),
       });
     }

@@ -1,27 +1,22 @@
 /**
  * Products page
- * BOM uses a yield model:
+ * BOM uses a yield model + optional scrap factor:
  *   materialQty      = how many units of material
  *   productsPerBatch = how many products that amount makes
- *
- * e.g. "1 sheet of HPL makes 5 t700" → materialQty=1, productsPerBatch=5
- *      "4 pins per 1 t700"            → materialQty=4, productsPerBatch=1
+ *   scrapFactor      = waste padding (0.05 = 5% extra ordered)
  */
 import { useState, useEffect } from "react";
 import { api } from "../api";
 
-// Human-readable BOM ratio label, e.g. "1 sheet per 5 products" or "4 pins per product"
 function bomLabel(pp) {
   const unit = pp.part.unit;
-  if (pp.productsPerBatch === 1) {
-    return `${pp.materialQty} ${unit} per product`;
-  }
-  return `${pp.materialQty} ${unit} per ${pp.productsPerBatch} products`;
+  const scrap = pp.scrapFactor ? ` +${(pp.scrapFactor * 100).toFixed(0)}% scrap` : "";
+  if (pp.productsPerBatch === 1) return `${pp.materialQty} ${unit} per product${scrap}`;
+  return `${pp.materialQty} ${unit} per ${pp.productsPerBatch} products${scrap}`;
 }
 
-// Minimum stock needed for 1 product (for the "In Stock" status check)
 function neededFor1(pp) {
-  return Math.ceil(pp.materialQty / pp.productsPerBatch);
+  return Math.ceil((pp.materialQty / pp.productsPerBatch) * (1 + (pp.scrapFactor ?? 0)));
 }
 
 export default function Products() {
@@ -33,7 +28,7 @@ export default function Products() {
   const [error, setError]       = useState("");
   const [success, setSuccess]   = useState("");
 
-  const blank = { name: "", dailyCapacity: 100, description: "", parts: [] };
+  const blank = { name: "", dailyCapacity: 100, description: "", finishedStock: 0, parts: [] };
   const [form, setForm] = useState(blank);
 
   const load = async () => {
@@ -51,13 +46,15 @@ export default function Products() {
   const openCreate = () => { setForm(blank); setEditing(null); setShowForm(true); setError(""); };
   const openEdit   = (prod) => {
     setForm({
-      name: prod.name,
+      name:          prod.name,
       dailyCapacity: prod.dailyCapacity,
-      description: prod.description,
+      description:   prod.description,
+      finishedStock: prod.finishedStock,
       parts: prod.productParts.map((pp) => ({
-        partId: pp.partId,
-        materialQty: pp.materialQty,
+        partId:          pp.partId,
+        materialQty:     pp.materialQty,
         productsPerBatch: pp.productsPerBatch,
+        scrapFactor:     Math.round((pp.scrapFactor ?? 0) * 100), // store as % in UI
       })),
     });
     setEditing(prod);
@@ -66,11 +63,13 @@ export default function Products() {
   };
   const closeForm = () => { setShowForm(false); setEditing(null); };
 
-  // BOM helpers
   const addBomRow = () => {
     const unused = parts.find((p) => !form.parts.some((fp) => Number(fp.partId) === p.id));
     if (!unused) return;
-    setForm((f) => ({ ...f, parts: [...f.parts, { partId: unused.id, materialQty: 1, productsPerBatch: 1 }] }));
+    setForm((f) => ({
+      ...f,
+      parts: [...f.parts, { partId: unused.id, materialQty: 1, productsPerBatch: 1, scrapFactor: 0 }],
+    }));
   };
   const removeBomRow = (idx) =>
     setForm((f) => ({ ...f, parts: f.parts.filter((_, i) => i !== idx) }));
@@ -86,12 +85,15 @@ export default function Products() {
     if (form.parts.length === 0) { setError("Add at least one material to the BOM"); return; }
     try {
       const payload = {
-        ...form,
+        name:          form.name,
         dailyCapacity: Number(form.dailyCapacity),
+        description:   form.description,
+        finishedStock: Number(form.finishedStock),
         parts: form.parts.map((p) => ({
-          partId: Number(p.partId),
-          materialQty: Number(p.materialQty),
+          partId:           Number(p.partId),
+          materialQty:      Number(p.materialQty),
           productsPerBatch: Number(p.productsPerBatch),
+          scrapFactor:      Number(p.scrapFactor ?? 0) / 100, // convert % → fraction
         })),
       };
       if (editing) {
@@ -136,7 +138,6 @@ export default function Products() {
       {error   && <div className="alert alert-error">{error}</div>}
       {success && <div className="alert alert-success">{success}</div>}
 
-      {/* ── Create / Edit form ── */}
       {showForm && (
         <div className="card mt-4">
           <div className="card-header">
@@ -157,11 +158,19 @@ export default function Products() {
                   placeholder="e.g. 200" />
               </div>
             </div>
-            <div className="field">
-              <label>Description</label>
-              <textarea value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="Optional description" />
+            <div className="form-row">
+              <div className="field">
+                <label>Description</label>
+                <textarea value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="Optional description" />
+              </div>
+              <div className="field">
+                <label>Finished Stock (units in warehouse)</label>
+                <input type="number" min="0" step="1" value={form.finishedStock}
+                  onChange={(e) => setForm({ ...form, finishedStock: e.target.value })}
+                  placeholder="0" />
+              </div>
             </div>
 
             {/* ── Bill of Materials ── */}
@@ -173,16 +182,15 @@ export default function Products() {
                 </span>
               </div>
               <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
-                For each material: enter how many units you need and how many products that covers.
-                Example: 1 sheet covers 5 products → materialQty=1, productsPerBatch=5.
+                Enter how many units of material you need and how many products that covers. Add a scrap % to pad for waste.
               </div>
 
-              {/* Column headers */}
               {form.parts.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 140px auto", gap: 8, marginBottom: 4 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 90px 130px 90px auto", gap: 8, marginBottom: 4 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Material</span>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Qty</span>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Covers N products</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Scrap %</span>
                   <span />
                 </div>
               )}
@@ -190,8 +198,7 @@ export default function Products() {
               {form.parts.map((row, idx) => {
                 const part = parts.find((p) => p.id === Number(row.partId));
                 return (
-                  <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 110px 140px auto", gap: 8, marginBottom: 8, alignItems: "center" }}>
-                    {/* Material selector */}
+                  <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 90px 130px 90px auto", gap: 8, marginBottom: 8, alignItems: "center" }}>
                     <select
                       value={row.partId}
                       onChange={(e) => updateBomRow(idx, "partId", Number(e.target.value))}
@@ -200,44 +207,47 @@ export default function Products() {
                         <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>
                       ))}
                     </select>
-
-                    {/* How many units of material */}
-                    <input
-                      type="number" min="1"
+                    <input type="number" min="1"
                       value={row.materialQty}
                       onChange={(e) => updateBomRow(idx, "materialQty", e.target.value)}
                       title={`How many ${part?.unit ?? "units"} of material`}
                     />
-
-                    {/* How many products that covers */}
-                    <input
-                      type="number" min="1"
+                    <input type="number" min="1"
                       value={row.productsPerBatch}
                       onChange={(e) => updateBomRow(idx, "productsPerBatch", e.target.value)}
                       title="How many products can be made from the quantity above"
                     />
-
+                    <input type="number" min="0" max="100" step="1"
+                      value={row.scrapFactor ?? 0}
+                      onChange={(e) => updateBomRow(idx, "scrapFactor", e.target.value)}
+                      title="Waste percentage (e.g. 5 = order 5% extra)"
+                      placeholder="0"
+                    />
                     <button type="button" className="btn btn-danger btn-sm" onClick={() => removeBomRow(idx)}>✕</button>
                   </div>
                 );
               })}
 
-              {/* Live preview of the ratio */}
               {form.parts.length > 0 && (
                 <div style={{ background: "#f8fafc", border: "1px solid var(--border)", borderRadius: 6, padding: "10px 14px", fontSize: 12, marginTop: 4 }}>
                   {form.parts.map((row, idx) => {
                     const part = parts.find((p) => p.id === Number(row.partId));
-                    const qty = Number(row.materialQty) || 1;
-                    const per = Number(row.productsPerBatch) || 1;
-                    const perProduct = (qty / per).toFixed(4).replace(/\.?0+$/, "");
+                    const qty   = Number(row.materialQty) || 1;
+                    const per   = Number(row.productsPerBatch) || 1;
+                    const scrap = Number(row.scrapFactor ?? 0) / 100;
+                    const base  = qty / per;
+                    const withScrap = base * (1 + scrap);
                     return (
                       <div key={idx} style={{ marginBottom: 2 }}>
                         <span style={{ color: "var(--muted)" }}>
                           {qty} {part?.unit ?? "unit"} of <strong>{part?.name ?? "?"}</strong>
                           {per > 1 ? ` makes ${per} products` : " per product"}
+                          {scrap > 0 ? ` +${(scrap * 100).toFixed(0)}% scrap` : ""}
                           {" → "}
                         </span>
-                        <strong>{perProduct} {part?.unit ?? "unit"}{per > 1 ? "" : "s"} consumed per product</strong>
+                        <strong>
+                          {withScrap.toFixed(4).replace(/\.?0+$/, "")} {part?.unit ?? "unit"} consumed per product
+                        </strong>
                       </div>
                     );
                   })}
@@ -262,7 +272,6 @@ export default function Products() {
         </div>
       )}
 
-      {/* ── Products list ── */}
       {products.length === 0 && !showForm ? (
         <div className="card mt-4">
           <div className="empty">
@@ -278,6 +287,11 @@ export default function Products() {
                 <span>📦</span>
                 <span>{prod.name}</span>
                 <span className="muted" style={{ fontWeight: 400 }}>— {prod.dailyCapacity} units/day</span>
+                {prod.finishedStock > 0 && (
+                  <span className="badge badge-ok" style={{ marginLeft: 4 }}>
+                    {prod.finishedStock} in stock
+                  </span>
+                )}
               </div>
               <div className="gap-2">
                 <button className="btn btn-ghost btn-sm" onClick={() => openEdit(prod)}>Edit</button>
@@ -289,7 +303,6 @@ export default function Products() {
                 {prod.description}
               </div>
             )}
-            {/* BOM table */}
             <table>
               <thead>
                 <tr>

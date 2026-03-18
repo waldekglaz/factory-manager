@@ -2,7 +2,8 @@
  * Orders page
  * - Place a new order (triggers the production planning algorithm)
  * - List all orders with their calculated production window
- * - Start production (deducts stock), complete, cancel
+ * - Start production, complete, cancel, recalculate
+ * - Print work order / delivery note
  */
 import { useState, useEffect } from "react";
 import { api } from "../api";
@@ -19,24 +20,44 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export default function Orders() {
-  const [orders, setOrders]     = useState([]);
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [expanded, setExpanded] = useState(null); // order id to show detail
-  const [error, setError]       = useState("");
-  const [success, setSuccess]   = useState("");
+function addDaysClient(date, n) {
+  const d = new Date(date); d.setDate(d.getDate() + n); return d;
+}
+function addWorkingDaysClient(date, n) {
+  const d = new Date(date);
+  let remaining = n;
+  while (remaining > 0) {
+    d.setDate(d.getDate() + 1);
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) remaining--;
+  }
+  return d;
+}
 
-  const blank = { productId: "", quantity: 1, desiredDeadline: "", notes: "" };
-  const [form, setForm]     = useState(blank);
-  const [preview, setPreview] = useState(null); // live plan preview (before submit)
+export default function Orders() {
+  const [orders,    setOrders]    = useState([]);
+  const [products,  setProducts]  = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [showForm,  setShowForm]  = useState(false);
+  const [expanded,  setExpanded]  = useState(null);
+  const [error,     setError]     = useState("");
+  const [success,   setSuccess]   = useState("");
+
+  const blank = { productId: "", customerId: "", quantity: 1, desiredDeadline: "", notes: "" };
+  const [form,    setForm]    = useState(blank);
+  const [preview, setPreview] = useState(null);
 
   const load = async () => {
     try {
-      const [ords, prods] = await Promise.all([api.orders.list(), api.products.list()]);
+      const [ords, prods, custs] = await Promise.all([
+        api.orders.list(),
+        api.products.list(),
+        api.customers.list(),
+      ]);
       setOrders(ords);
       setProducts(prods);
+      setCustomers(custs);
     } finally {
       setLoading(false);
     }
@@ -44,46 +65,47 @@ export default function Orders() {
 
   useEffect(() => { load(); }, []);
 
-  // ── Live preview: re-calculate whenever productId or quantity changes ─────────
-  // We approximate it client-side so the user sees a plan BEFORE placing the order.
+  // Live preview recalculated whenever product or quantity changes
   useEffect(() => {
     if (!form.productId || !form.quantity) { setPreview(null); return; }
     const prod = products.find((p) => p.id === Number(form.productId));
     if (!prod) return;
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const breakdown = prod.productParts.map((pp) => {
-      const needed  = Math.ceil((pp.materialQty * Number(form.quantity)) / pp.productsPerBatch);
-      const inStock = Math.min(pp.part.currentStock, needed);
-      const missing = Math.max(0, needed - pp.part.currentStock);
-      const avail   = missing > 0 ? addDaysClient(today, pp.part.supplierLeadTime) : today;
-      return { ...pp, needed, inStock, missing, avail };
-    });
 
-    const start = breakdown.length
-      ? new Date(Math.max(...breakdown.map((b) => b.avail.getTime())))
-      : today;
-    const productionDays = Math.ceil(Number(form.quantity) / prod.dailyCapacity);
-    const end = addWorkingDaysClient(start, productionDays);
+    // Check finished goods first
+    const finishedStock      = prod.finishedStock ?? 0;
+    const qty                = Number(form.quantity);
+    const fulfilledFromStock = Math.min(finishedStock, qty);
+    const productionQty      = qty - fulfilledFromStock;
 
-    setPreview({ breakdown, start, end, prod, productionDays });
-  }, [form.productId, form.quantity, products]);
-
-  // Calendar days — used for supplier lead times
-  function addDaysClient(date, n) {
-    const d = new Date(date); d.setDate(d.getDate() + n); return d;
-  }
-  // Working days Mon–Fri — used for production duration
-  function addWorkingDaysClient(date, n) {
-    const d = new Date(date);
-    let remaining = n;
-    while (remaining > 0) {
-      d.setDate(d.getDate() + 1);
-      const day = d.getDay();
-      if (day !== 0 && day !== 6) remaining--;
+    let breakdown = [];
+    if (productionQty > 0) {
+      breakdown = prod.productParts.map((pp) => {
+        const scrap  = pp.scrapFactor ?? 0;
+        const needed = Math.ceil((pp.materialQty * productionQty) / pp.productsPerBatch * (1 + scrap));
+        const inStock = Math.min(pp.part.currentStock, needed);
+        const missing = Math.max(0, needed - pp.part.currentStock);
+        const avail   = missing > 0 ? addDaysClient(today, pp.part.supplierLeadTime) : today;
+        return { ...pp, needed, inStock, missing, avail };
+      });
     }
-    return d;
-  }
+
+    let start, end, productionDays;
+    if (productionQty === 0) {
+      start          = today;
+      end            = today;
+      productionDays = 0;
+    } else {
+      start          = breakdown.length
+        ? new Date(Math.max(...breakdown.map((b) => b.avail.getTime())))
+        : today;
+      productionDays = Math.ceil(productionQty / prod.dailyCapacity);
+      end            = addWorkingDaysClient(start, productionDays);
+    }
+
+    setPreview({ breakdown, start, end, prod, productionDays, fulfilledFromStock, productionQty });
+  }, [form.productId, form.quantity, products]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -91,6 +113,7 @@ export default function Orders() {
     try {
       const order = await api.orders.create({
         productId:       Number(form.productId),
+        customerId:      form.customerId ? Number(form.customerId) : undefined,
         quantity:        Number(form.quantity),
         desiredDeadline: form.desiredDeadline || undefined,
         notes:           form.notes,
@@ -108,15 +131,13 @@ export default function Orders() {
 
   const doAction = async (order, action) => {
     setError("");
+    const labels = { start: "Start production", recalculate: "Recalculate plan", complete: "Complete", cancel: "Cancel" };
+    if (!confirm(`${labels[action]} order #${order.id} — "${order.product.name}"?`)) return;
     try {
-      const labels = { start: "Start production", recalculate: "Recalculate plan", complete: "Complete", cancel: "Cancel" };
-      if (!confirm(`${labels[action]} order #${order.id} — "${order.product.name}"?`)) return;
-
       if (action === "start")       await api.orders.start(order.id);
       if (action === "recalculate") await api.orders.recalculate(order.id);
       if (action === "complete")    await api.orders.complete(order.id);
       if (action === "cancel")      await api.orders.cancel(order.id);
-
       setSuccess(`Order #${order.id} updated`);
       await load();
       setTimeout(() => setSuccess(""), 3000);
@@ -132,7 +153,9 @@ export default function Orders() {
       <div className="page-header">
         <div>
           <div className="page-title">Orders</div>
-          <div className="page-subtitle">{orders.length} total · {orders.filter((o) => o.status === "in_production").length} in production</div>
+          <div className="page-subtitle">
+            {orders.length} total · {orders.filter((o) => o.status === "in_production").length} in production
+          </div>
         </div>
         <button className="btn btn-primary" onClick={() => { setShowForm(true); setError(""); }}>
           + Place Order
@@ -153,7 +176,11 @@ export default function Orders() {
                 <select required value={form.productId}
                   onChange={(e) => setForm({ ...form, productId: e.target.value })}>
                   <option value="">— select product —</option>
-                  {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}{p.finishedStock > 0 ? ` (${p.finishedStock} in stock)` : ""}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="field">
@@ -164,14 +191,22 @@ export default function Orders() {
             </div>
             <div className="form-row">
               <div className="field">
+                <label>Customer (optional)</label>
+                <select value={form.customerId}
+                  onChange={(e) => setForm({ ...form, customerId: e.target.value })}>
+                  <option value="">— internal / no customer —</option>
+                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="field">
                 <label>Desired Deadline (optional)</label>
                 <input type="date" value={form.desiredDeadline}
                   onChange={(e) => setForm({ ...form, desiredDeadline: e.target.value })} />
               </div>
-              <div className="field">
-                <label>Notes</label>
-                <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="optional" />
-              </div>
+            </div>
+            <div className="field">
+              <label>Notes</label>
+              <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="optional" />
             </div>
 
             {/* Live plan preview */}
@@ -180,41 +215,55 @@ export default function Orders() {
                 <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 13 }}>
                   Production Plan Preview
                 </div>
+
+                {preview.fulfilledFromStock > 0 && (
+                  <div className="alert alert-success" style={{ marginBottom: 12 }}>
+                    {preview.fulfilledFromStock} unit(s) fulfilled from finished goods stock.
+                    {preview.productionQty > 0
+                      ? ` ${preview.productionQty} unit(s) will be produced.`
+                      : " No production needed."}
+                  </div>
+                )}
+
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
                   <Stat label="Production Start" value={fmtDate(preview.start)} />
                   <Stat label="Production End"   value={fmtDate(preview.end)} />
-                  <Stat label="Duration"         value={`${preview.productionDays} day(s)`} />
+                  <Stat label="Duration"         value={preview.productionDays > 0 ? `${preview.productionDays} working day(s)` : "From stock"} />
                 </div>
+
                 {form.desiredDeadline && (
                   <div className={`alert ${preview.end <= new Date(form.desiredDeadline) ? "alert-success" : "alert-error"}`}
-                    style={{ marginBottom: 0 }}>
+                    style={{ marginBottom: 12 }}>
                     {preview.end <= new Date(form.desiredDeadline)
                       ? `On time — completes ${Math.round((new Date(form.desiredDeadline) - preview.end) / 86400000)} day(s) before deadline`
                       : `Late by ${Math.round((preview.end - new Date(form.desiredDeadline)) / 86400000)} day(s)`}
                   </div>
                 )}
-                <table style={{ marginTop: 12 }}>
-                  <thead>
-                    <tr>
-                      <th>Part</th>
-                      <th>Needed</th>
-                      <th>Allocated</th>
-                      <th>Still Missing</th>
-                      <th>Expected</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.breakdown.map((b, i) => (
-                      <tr key={i}>
-                        <td>{b.part.name}</td>
-                        <td>{b.needed} {b.part.unit}</td>
-                        <td className={b.missing > 0 ? "warning" : "success"}>{b.inStock}</td>
-                        <td className={b.missing > 0 ? "danger bold" : "muted"}>{b.missing > 0 ? b.missing : "—"}</td>
-                        <td className={b.missing > 0 ? "warning" : "muted"}>{fmtDate(b.avail)}</td>
+
+                {preview.breakdown.length > 0 && (
+                  <table style={{ marginTop: 4 }}>
+                    <thead>
+                      <tr>
+                        <th>Material</th>
+                        <th>Needed</th>
+                        <th>Allocated</th>
+                        <th>Still Missing</th>
+                        <th>Expected</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {preview.breakdown.map((b, i) => (
+                        <tr key={i}>
+                          <td>{b.part.name}</td>
+                          <td>{b.needed} {b.part.unit}</td>
+                          <td className={b.missing > 0 ? "warning" : "success"}>{b.inStock}</td>
+                          <td className={b.missing > 0 ? "danger bold" : "muted"}>{b.missing > 0 ? b.missing : "—"}</td>
+                          <td className={b.missing > 0 ? "warning" : "muted"}>{fmtDate(b.avail)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
 
@@ -242,6 +291,7 @@ export default function Orders() {
                 <tr>
                   <th>#</th>
                   <th>Product</th>
+                  <th>Customer</th>
                   <th>Qty</th>
                   <th>Status</th>
                   <th>Start</th>
@@ -257,6 +307,7 @@ export default function Orders() {
                     <tr key={order.id}>
                       <td className="muted mono">#{order.id}</td>
                       <td className="bold">{order.product.name}</td>
+                      <td className="muted">{order.customer?.name ?? "—"}</td>
                       <td>{order.quantity}</td>
                       <td><span className={`badge badge-${order.status}`}>{order.status.replace("_", " ")}</span></td>
                       <td>{fmtDate(order.productionStartDate)}</td>
@@ -269,13 +320,13 @@ export default function Orders() {
                             : <span className="danger">No</span>}
                       </td>
                       <td>
-                        <div className="gap-2">
+                        <div className="gap-2" style={{ flexWrap: "wrap" }}>
                           <button className="btn btn-ghost btn-sm"
                             onClick={() => setExpanded(expanded === order.id ? null : order.id)}>
                             {expanded === order.id ? "Hide" : "Details"}
                           </button>
                           {STATUS_ACTIONS[order.status]?.includes("recalculate") && (
-                            <button className="btn btn-ghost btn-sm" onClick={() => doAction(order, "recalculate")} title="Re-run planning with current stock levels">
+                            <button className="btn btn-ghost btn-sm" onClick={() => doAction(order, "recalculate")} title="Re-run planning with current stock">
                               Recalculate
                             </button>
                           )}
@@ -288,16 +339,39 @@ export default function Orders() {
                           {STATUS_ACTIONS[order.status]?.includes("cancel") && (
                             <button className="btn btn-danger btn-sm" onClick={() => doAction(order, "cancel")}>Cancel</button>
                           )}
+                          {/* Print buttons — available for all non-cancelled orders */}
+                          {order.status !== "cancelled" && (
+                            <>
+                              <a className="btn btn-ghost btn-sm"
+                                href={api.orders.workOrderUrl(order.id)}
+                                target="_blank" rel="noreferrer"
+                                title="Open printable work order">
+                                Work Order
+                              </a>
+                              <a className="btn btn-ghost btn-sm"
+                                href={api.orders.deliveryNoteUrl(order.id)}
+                                target="_blank" rel="noreferrer"
+                                title="Open printable delivery note">
+                                Delivery Note
+                              </a>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
+
                     {/* Expanded parts breakdown */}
                     {expanded === order.id && (
                       <tr key={`${order.id}-detail`}>
-                        <td colSpan={9} style={{ padding: 0 }}>
+                        <td colSpan={10} style={{ padding: 0 }}>
                           <div style={{ background: "#f8fafc", padding: 16 }}>
                             <div style={{ fontWeight: 700, marginBottom: 10, fontSize: 13 }}>
                               Parts Breakdown — Order #{order.id}
+                              {order.fulfilledFromStock > 0 && (
+                                <span className="badge badge-ok" style={{ marginLeft: 8, fontWeight: 400 }}>
+                                  {order.fulfilledFromStock} unit(s) from finished goods
+                                </span>
+                              )}
                             </div>
                             <div className="parts-grid">
                               {order.orderParts.map((op) => (

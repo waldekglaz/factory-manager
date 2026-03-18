@@ -69,7 +69,7 @@ export default function Dashboard() {
   if (loading) return <div className="loading-page"><div className="spinner" /> Loading dashboard…</div>;
   if (!data)   return <div className="page"><div className="alert alert-error">Failed to load dashboard</div></div>;
 
-  const { stats, alerts, inProductionOrders, plannedOrders, recentlyCompleted } = data;
+  const { stats, alerts, inProductionOrders, plannedOrders, recentlyCompleted, availableToShip } = data;
 
   const totalAlerts = alerts.outOfStock.length + alerts.lowStock.length;
 
@@ -97,11 +97,12 @@ export default function Dashboard() {
 
       {/* ── Stat cards ── */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <StatCard label="In Production"   value={stats.inProduction}  color="#f59e0b" sub="active runs" />
-        <StatCard label="Planned Orders"  value={stats.planned}       color="#3b82f6" sub="awaiting start" />
-        <StatCard label="Completed"       value={stats.completed}     color="#22c55e" sub="all time" />
-        <StatCard label="Out of Stock"    value={stats.outOfStock}    color={stats.outOfStock   > 0 ? "#dc2626" : "#22c55e"} sub="materials" />
-        <StatCard label="Low Stock"       value={stats.lowStock}      color={stats.lowStock     > 0 ? "#d97706" : "#22c55e"} sub="below minimum" />
+        <StatCard label="In Production"     value={stats.inProduction}  color="#f59e0b" sub="active runs" />
+        <StatCard label="Planned Orders"   value={stats.planned}       color="#3b82f6" sub="awaiting start" />
+        <StatCard label="Completed"        value={stats.completed}     color="#22c55e" sub="all time" />
+        <StatCard label="Available to Ship" value={availableToShip ?? 0} color="#8b5cf6" sub="products in stock" />
+        <StatCard label="Out of Stock"     value={stats.outOfStock}    color={stats.outOfStock > 0 ? "#dc2626" : "#22c55e"} sub="materials" />
+        <StatCard label="Low Stock"        value={stats.lowStock}      color={stats.lowStock   > 0 ? "#d97706" : "#22c55e"} sub="below minimum" />
       </div>
 
       {/* ── Stock alerts ── */}

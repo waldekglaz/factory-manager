@@ -49,5 +49,33 @@ export const api = {
     recalculate: (id)   => request("POST", `/orders/${id}/recalculate`),
     complete:    (id)   => request("POST", `/orders/${id}/complete`),
     cancel:      (id)   => request("POST", `/orders/${id}/cancel`),
+    workOrderUrl:    (id) => `${BASE}/orders/${id}/work-order`,
+    deliveryNoteUrl: (id) => `${BASE}/orders/${id}/delivery-note`,
+  },
+
+  customers: {
+    list:   ()       => request("GET",    "/customers"),
+    get:    (id)     => request("GET",    `/customers/${id}`),
+    orders: (id)     => request("GET",    `/customers/${id}/orders`),
+    create: (data)   => request("POST",   "/customers", data),
+    update: (id, d)  => request("PUT",    `/customers/${id}`, d),
+    delete: (id)     => request("DELETE", `/customers/${id}`),
+  },
+
+  suppliers: {
+    list:       ()           => request("GET",    "/suppliers"),
+    create:     (data)       => request("POST",   "/suppliers", data),
+    update:     (id, d)      => request("PUT",    `/suppliers/${id}`, d),
+    delete:     (id)         => request("DELETE", `/suppliers/${id}`),
+    linkPart:   (id, data)   => request("POST",   `/suppliers/${id}/parts`, data),
+    unlinkPart: (sid, pid)   => request("DELETE", `/suppliers/${sid}/parts/${pid}`),
+  },
+
+  purchaseOrders: {
+    list:    ()       => request("GET",  "/purchase-orders"),
+    get:     (id)     => request("GET",  `/purchase-orders/${id}`),
+    create:  (data)   => request("POST", "/purchase-orders", data),
+    update:  (id, d)  => request("PUT",  `/purchase-orders/${id}`, d),
+    receive: (id, d)  => request("POST", `/purchase-orders/${id}/receive`, d),
   },
 };

@@ -24,6 +24,7 @@ router.get("/", async (req, res) => {
     inProductionOrders,
     plannedOrders,
     recentlyCompleted,
+    productsInStock,
   ] = await Promise.all([
     // All parts — we'll derive low-stock and out-of-stock from this
     prisma.part.findMany({ orderBy: { name: "asc" } }),
@@ -57,6 +58,12 @@ router.get("/", async (req, res) => {
       include: { product: true },
       orderBy: { updatedAt: "desc" },
       take: 5,
+    }),
+
+    // Products with finished goods in stock
+    prisma.product.findMany({
+      where: { finishedStock: { gt: 0 } },
+      select: { id: true, name: true, finishedStock: true },
     }),
   ]);
 
@@ -102,6 +109,8 @@ router.get("/", async (req, res) => {
     inProductionOrders: inProductionWithFlags,
     plannedOrders:      plannedWithFlags,
     recentlyCompleted,
+    availableToShip:    productsInStock.length,
+    productsInStock,
   });
 });
 
