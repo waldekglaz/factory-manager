@@ -1,8 +1,10 @@
 /**
  * Seed script — populates the database with realistic example data.
  *
- * Parts:    screws, bearings, motor housing, copper wire, PCB, fan blade
- * Products: Electric Motor, Industrial Fan, Control Panel
+ * Materials:  screws, bearings, motor housing, copper wire, PCB, fan blade, etc.
+ * Products:   Electric Motor AC-3, Industrial Fan IF-600, Control Panel CP-12
+ * Customers:  2 example customers
+ * Suppliers:  2 example suppliers with parts linked
  *
  * Run:  node prisma/seed.js
  */
@@ -13,122 +15,236 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("Seeding database...");
 
-  // ── Parts ──────────────────────────────────────────────────────────────────
+  // ── Materials (Parts) ───────────────────────────────────────────────────────
   const parts = await Promise.all([
     prisma.part.upsert({
-      where: { name: "Steel Screw M6" },
+      where:  { name: "Steel Screw M6" },
       update: {},
       create: { name: "Steel Screw M6",    currentStock: 500, minimumStock: 100, supplierLeadTime: 2,  unit: "pcs" },
     }),
     prisma.part.upsert({
-      where: { name: "Ball Bearing 6205" },
+      where:  { name: "Ball Bearing 6205" },
       update: {},
       create: { name: "Ball Bearing 6205", currentStock: 20,  minimumStock: 10,  supplierLeadTime: 7,  unit: "pcs" },
     }),
     prisma.part.upsert({
-      where: { name: "Motor Housing" },
+      where:  { name: "Motor Housing" },
       update: {},
       create: { name: "Motor Housing",     currentStock: 5,   minimumStock: 2,   supplierLeadTime: 14, unit: "pcs" },
     }),
     prisma.part.upsert({
-      where: { name: "Copper Wire 1mm" },
+      where:  { name: "Copper Wire 1mm" },
       update: {},
       create: { name: "Copper Wire 1mm",   currentStock: 200, minimumStock: 50,  supplierLeadTime: 5,  unit: "m"   },
     }),
     prisma.part.upsert({
-      where: { name: "Control PCB" },
+      where:  { name: "Control PCB" },
       update: {},
       create: { name: "Control PCB",       currentStock: 3,   minimumStock: 5,   supplierLeadTime: 10, unit: "pcs" },
     }),
     prisma.part.upsert({
-      where: { name: "Fan Blade 300mm" },
+      where:  { name: "Fan Blade 300mm" },
       update: {},
       create: { name: "Fan Blade 300mm",   currentStock: 8,   minimumStock: 3,   supplierLeadTime: 6,  unit: "pcs" },
     }),
     prisma.part.upsert({
-      where: { name: "Capacitor 100uF" },
+      where:  { name: "Capacitor 100uF" },
       update: {},
       create: { name: "Capacitor 100uF",   currentStock: 150, minimumStock: 30,  supplierLeadTime: 3,  unit: "pcs" },
     }),
     prisma.part.upsert({
-      where: { name: "Rotor Core" },
+      where:  { name: "Rotor Core" },
       update: {},
       create: { name: "Rotor Core",        currentStock: 4,   minimumStock: 2,   supplierLeadTime: 12, unit: "pcs" },
     }),
   ]);
 
-  const byName = Object.fromEntries(parts.map((p) => [p.name, p]));
-  console.log(`  Created ${parts.length} parts`);
+  const p = Object.fromEntries(parts.map((x) => [x.name, x]));
+  console.log(`  Created ${parts.length} materials`);
 
-  // ── Products ───────────────────────────────────────────────────────────────
-  const motorProduct = await prisma.product.upsert({
-    where: { name: "Electric Motor AC-3" },
+  // ── Products ────────────────────────────────────────────────────────────────
+  // dailyCapacity = how many units can be produced per working day
+  // BOM uses yield model: materialQty units of material make productsPerBatch products
+  // scrapFactor = fractional waste padding (0.05 = order 5% extra)
+  const motor = await prisma.product.upsert({
+    where:  { name: "Electric Motor AC-3" },
     update: {},
     create: {
-      name: "Electric Motor AC-3",
-      productionTime: 3, // 3 days to manufacture
-      description: "3-phase AC induction motor, 2.2kW",
+      name:          "Electric Motor AC-3",
+      dailyCapacity: 10,
+      description:   "3-phase AC induction motor, 2.2kW",
+      finishedStock: 2, // 2 units already in warehouse
       productParts: {
         create: [
-          { partId: byName["Steel Screw M6"].id,    quantityRequired: 12 },
-          { partId: byName["Ball Bearing 6205"].id,  quantityRequired: 2  },
-          { partId: byName["Motor Housing"].id,      quantityRequired: 1  },
-          { partId: byName["Copper Wire 1mm"].id,    quantityRequired: 15 },
-          { partId: byName["Rotor Core"].id,         quantityRequired: 1  },
-          { partId: byName["Capacitor 100uF"].id,    quantityRequired: 4  },
+          // 12 screws per motor, 2% scrap
+          { partId: p["Steel Screw M6"].id,    materialQty: 12, productsPerBatch: 1, scrapFactor: 0.02 },
+          // 2 bearings per motor
+          { partId: p["Ball Bearing 6205"].id,  materialQty: 2,  productsPerBatch: 1, scrapFactor: 0    },
+          // 1 housing per motor
+          { partId: p["Motor Housing"].id,      materialQty: 1,  productsPerBatch: 1, scrapFactor: 0    },
+          // 15m wire per motor, 5% scrap (cutting waste)
+          { partId: p["Copper Wire 1mm"].id,    materialQty: 15, productsPerBatch: 1, scrapFactor: 0.05 },
+          // 1 rotor core per motor
+          { partId: p["Rotor Core"].id,         materialQty: 1,  productsPerBatch: 1, scrapFactor: 0    },
+          // 4 capacitors per motor
+          { partId: p["Capacitor 100uF"].id,    materialQty: 4,  productsPerBatch: 1, scrapFactor: 0    },
         ],
       },
     },
   });
 
-  const fanProduct = await prisma.product.upsert({
-    where: { name: "Industrial Fan IF-600" },
+  const fan = await prisma.product.upsert({
+    where:  { name: "Industrial Fan IF-600" },
     update: {},
     create: {
-      name: "Industrial Fan IF-600",
-      productionTime: 2, // 2 days
-      description: "600mm industrial axial fan",
+      name:          "Industrial Fan IF-600",
+      dailyCapacity: 20,
+      description:   "600mm industrial axial fan",
+      finishedStock: 0,
       productParts: {
         create: [
-          { partId: byName["Steel Screw M6"].id,    quantityRequired: 8  },
-          { partId: byName["Fan Blade 300mm"].id,    quantityRequired: 3  },
-          { partId: byName["Ball Bearing 6205"].id,  quantityRequired: 1  },
-          { partId: byName["Motor Housing"].id,      quantityRequired: 1  },
+          { partId: p["Steel Screw M6"].id,    materialQty: 8, productsPerBatch: 1, scrapFactor: 0    },
+          { partId: p["Fan Blade 300mm"].id,    materialQty: 3, productsPerBatch: 1, scrapFactor: 0    },
+          { partId: p["Ball Bearing 6205"].id,  materialQty: 1, productsPerBatch: 1, scrapFactor: 0    },
+          { partId: p["Motor Housing"].id,      materialQty: 1, productsPerBatch: 1, scrapFactor: 0    },
         ],
       },
     },
   });
 
-  const panelProduct = await prisma.product.upsert({
-    where: { name: "Control Panel CP-12" },
+  const panel = await prisma.product.upsert({
+    where:  { name: "Control Panel CP-12" },
     update: {},
     create: {
-      name: "Control Panel CP-12",
-      productionTime: 5, // 5 days (complex assembly)
-      description: "12-channel industrial control panel with PLC",
+      name:          "Control Panel CP-12",
+      dailyCapacity: 5,
+      description:   "12-channel industrial control panel with PLC",
+      finishedStock: 0,
       productParts: {
         create: [
-          { partId: byName["Control PCB"].id,        quantityRequired: 2  },
-          { partId: byName["Capacitor 100uF"].id,    quantityRequired: 24 },
-          { partId: byName["Copper Wire 1mm"].id,    quantityRequired: 30 },
-          { partId: byName["Steel Screw M6"].id,     quantityRequired: 20 },
+          // 1 PCB sheet yields 2 control boards after cutting — scrap factor 3%
+          { partId: p["Control PCB"].id,        materialQty: 1,  productsPerBatch: 2, scrapFactor: 0.03 },
+          { partId: p["Capacitor 100uF"].id,    materialQty: 24, productsPerBatch: 1, scrapFactor: 0    },
+          { partId: p["Copper Wire 1mm"].id,    materialQty: 30, productsPerBatch: 1, scrapFactor: 0.05 },
+          { partId: p["Steel Screw M6"].id,     materialQty: 20, productsPerBatch: 1, scrapFactor: 0    },
         ],
       },
     },
   });
 
-  console.log(`  Created products: ${motorProduct.name}, ${fanProduct.name}, ${panelProduct.name}`);
+  console.log(`  Created products: ${motor.name}, ${fan.name}, ${panel.name}`);
 
-  // ── Example stock movements (history) ─────────────────────────────────────
+  // ── Customers ───────────────────────────────────────────────────────────────
+  const [cust1, cust2] = await Promise.all([
+    prisma.customer.upsert({
+      where:  { name: "Acme Manufacturing Ltd" },
+      update: {},
+      create: {
+        name:    "Acme Manufacturing Ltd",
+        email:   "procurement@acme.example.com",
+        phone:   "+44 20 1234 5678",
+        address: "14 Industrial Park\nBirmingham, B1 1AA\nUnited Kingdom",
+        notes:   "Long-standing customer. Prefers delivery on Tuesdays.",
+      },
+    }),
+    prisma.customer.upsert({
+      where:  { name: "Northern Engineering Co." },
+      update: {},
+      create: {
+        name:    "Northern Engineering Co.",
+        email:   "orders@northeng.example.com",
+        phone:   "+44 161 999 0000",
+        address: "7 Mill Road\nManchester, M2 3DF\nUnited Kingdom",
+      },
+    }),
+  ]);
+
+  console.log(`  Created customers: ${cust1.name}, ${cust2.name}`);
+
+  // ── Suppliers ───────────────────────────────────────────────────────────────
+  const [sup1, sup2] = await Promise.all([
+    prisma.supplier.upsert({
+      where:  { name: "FastFix Components" },
+      update: {},
+      create: {
+        name:            "FastFix Components",
+        email:           "sales@fastfix.example.com",
+        phone:           "+44 800 100 200",
+        defaultLeadTime: 3,
+        notes:           "Reliable for screws, bearings, and capacitors. Min order £50.",
+      },
+    }),
+    prisma.supplier.upsert({
+      where:  { name: "PrecisionParts UK" },
+      update: {},
+      create: {
+        name:            "PrecisionParts UK",
+        email:           "supply@precisionparts.example.com",
+        phone:           "+44 800 300 400",
+        defaultLeadTime: 10,
+        notes:           "Specialist in motor housings and rotor cores. Long lead times but high quality.",
+      },
+    }),
+  ]);
+
+  console.log(`  Created suppliers: ${sup1.name}, ${sup2.name}`);
+
+  // Link parts to suppliers (with optional cost and lead time overrides)
+  await Promise.all([
+    // FastFix supplies screws (2d lead time, £0.05 each) and bearings (5d, £3.20 each)
+    prisma.supplierPart.upsert({
+      where:  { supplierId_partId: { supplierId: sup1.id, partId: p["Steel Screw M6"].id } },
+      update: {},
+      create: { supplierId: sup1.id, partId: p["Steel Screw M6"].id,    unitCost: 0.05, leadTimeOverride: 2  },
+    }),
+    prisma.supplierPart.upsert({
+      where:  { supplierId_partId: { supplierId: sup1.id, partId: p["Ball Bearing 6205"].id } },
+      update: {},
+      create: { supplierId: sup1.id, partId: p["Ball Bearing 6205"].id,  unitCost: 3.20, leadTimeOverride: 5  },
+    }),
+    prisma.supplierPart.upsert({
+      where:  { supplierId_partId: { supplierId: sup1.id, partId: p["Capacitor 100uF"].id } },
+      update: {},
+      create: { supplierId: sup1.id, partId: p["Capacitor 100uF"].id,   unitCost: 0.18, leadTimeOverride: null },
+    }),
+    // PrecisionParts supplies housings and rotor cores
+    prisma.supplierPart.upsert({
+      where:  { supplierId_partId: { supplierId: sup2.id, partId: p["Motor Housing"].id } },
+      update: {},
+      create: { supplierId: sup2.id, partId: p["Motor Housing"].id,     unitCost: 42.0, leadTimeOverride: 14 },
+    }),
+    prisma.supplierPart.upsert({
+      where:  { supplierId_partId: { supplierId: sup2.id, partId: p["Rotor Core"].id } },
+      update: {},
+      create: { supplierId: sup2.id, partId: p["Rotor Core"].id,        unitCost: 28.5, leadTimeOverride: 12 },
+    }),
+    // FastFix also supplies bearings (slower but cheaper alternative)
+    prisma.supplierPart.upsert({
+      where:  { supplierId_partId: { supplierId: sup2.id, partId: p["Ball Bearing 6205"].id } },
+      update: {},
+      create: { supplierId: sup2.id, partId: p["Ball Bearing 6205"].id,  unitCost: 2.90, leadTimeOverride: 8  },
+    }),
+  ]);
+
+  console.log("  Linked parts to suppliers");
+
+  // ── Stock movements (history) ────────────────────────────────────────────────
   await prisma.stockMovement.createMany({
     data: [
-      { partId: byName["Steel Screw M6"].id,   quantity: 500,  reason: "initial_stock" },
-      { partId: byName["Ball Bearing 6205"].id, quantity: 20,  reason: "initial_stock" },
-      { partId: byName["Motor Housing"].id,     quantity: 10,  reason: "initial_stock" },
-      { partId: byName["Motor Housing"].id,     quantity: -5,  reason: "production_order_#0 (historical)" },
-      { partId: byName["Copper Wire 1mm"].id,   quantity: 200, reason: "initial_stock" },
-      { partId: byName["Control PCB"].id,       quantity: 5,   reason: "initial_stock" },
-      { partId: byName["Control PCB"].id,       quantity: -2,  reason: "production_order_#0 (historical)" },
+      { partId: p["Steel Screw M6"].id,    quantity:  500, reason: "initial_stock"                     },
+      { partId: p["Ball Bearing 6205"].id,  quantity:  20,  reason: "initial_stock"                     },
+      { partId: p["Motor Housing"].id,      quantity:  10,  reason: "initial_stock"                     },
+      { partId: p["Motor Housing"].id,      quantity:  -5,  reason: "production_order_#0 (historical)"  },
+      { partId: p["Copper Wire 1mm"].id,    quantity:  200, reason: "initial_stock"                     },
+      { partId: p["Control PCB"].id,        quantity:  5,   reason: "initial_stock"                     },
+      { partId: p["Control PCB"].id,        quantity:  -2,  reason: "production_order_#0 (historical)"  },
+    ],
+  });
+
+  // ── Finished goods movements (history) ──────────────────────────────────────
+  await prisma.finishedGoodsMovement.createMany({
+    data: [
+      { productId: motor.id, quantity: 2, reason: "initial_stock" },
     ],
   });
 
