@@ -1,0 +1,22 @@
+{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.2",
+    "@supabase/ssr": "^0.9.0",
+    "@supabase/supabase-js": "^2.99.3",
+    "next": "16.2.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.2"
+  }
+}

@@ -21,3 +21,5 @@ frontend/dist/
 # Editor
 .vscode/
 *.swp
+web/.next/
+web/node_modules/
