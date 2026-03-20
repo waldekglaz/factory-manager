@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 
 const NAV = [
@@ -14,15 +15,44 @@ const NAV = [
   { to: "/schedule",    icon: "📅", label: "Production Schedule" },
 ];
 
+function getSupabase() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [onlineUsers, setOnlineUsers] = useState([]);
+
+  useEffect(() => {
+    const supabase = getSupabase();
+    let channel;
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+
+      channel = supabase.channel("online-users");
+      channel
+        .on("presence", { event: "sync" }, () => {
+          const state = channel.presenceState();
+          const users = Object.values(state).flat();
+          setOnlineUsers(users);
+        })
+        .subscribe(async (status) => {
+          if (status === "SUBSCRIBED") {
+            await channel.track({ email: user.email });
+          }
+        });
+    });
+
+    return () => { channel?.unsubscribe(); };
+  }, []);
 
   const handleLogout = async () => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
+    const supabase = getSupabase();
     await supabase.auth.signOut();
     router.push("/login");
   };
@@ -44,7 +74,22 @@ export default function Sidebar() {
           </Link>
         ))}
       </nav>
-      <button className="nav-link" onClick={handleLogout} style={{ marginTop: "auto", background: "none", border: "none", cursor: "pointer", width: "100%", textAlign: "left" }}>
+
+      {onlineUsers.length > 0 && (
+        <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", marginTop: "auto" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>
+            <span style={{ color: "#22c55e", marginRight: 4 }}>●</span>
+            {onlineUsers.length} online
+          </div>
+          {onlineUsers.map((u, i) => (
+            <div key={i} style={{ fontSize: 12, color: "var(--muted)", padding: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {u.email?.split("@")[0]}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button className="nav-link" onClick={handleLogout} style={{ background: "none", border: "none", cursor: "pointer", width: "100%", textAlign: "left" }}>
         <span className="nav-icon">🚪</span>
         Log out
       </button>
