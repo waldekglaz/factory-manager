@@ -30,7 +30,7 @@ export default function Products() {
   const [error, setError]         = useState("");
   const [success, setSuccess]     = useState("");
 
-  const blank = { name: "", dailyCapacity: 100, description: "", parts: [], locationStocks: [] };
+  const blank = { name: "", dailyCapacity: 100, description: "", sellingPrice: "", parts: [], locationStocks: [] };
   const [form, setForm] = useState(blank);
 
   const load = async () => {
@@ -52,6 +52,7 @@ export default function Products() {
       name:          prod.name,
       dailyCapacity: prod.dailyCapacity,
       description:   prod.description,
+      sellingPrice:  prod.sellingPrice ?? "",
       parts: prod.productParts.map((pp) => ({
         partId:           pp.partId,
         materialQty:      pp.materialQty,
@@ -113,6 +114,7 @@ export default function Products() {
         name:          form.name,
         dailyCapacity: Number(form.dailyCapacity),
         description:   form.description,
+        sellingPrice:  form.sellingPrice !== "" ? Number(form.sellingPrice) : null,
         finishedStock,
         parts: form.parts.map((p) => ({
           partId:           Number(p.partId),
@@ -184,11 +186,19 @@ export default function Products() {
                   placeholder="e.g. 200" />
               </div>
             </div>
-            <div className="field">
-              <label>Description</label>
-              <textarea value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="Optional description" />
+            <div className="form-row">
+              <div className="field">
+                <label>Description</label>
+                <textarea value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="Optional description" />
+              </div>
+              <div className="field" style={{ maxWidth: 200 }}>
+                <label>Selling Price (per unit)</label>
+                <input type="number" min="0" step="0.01" value={form.sellingPrice}
+                  onChange={(e) => setForm({ ...form, sellingPrice: e.target.value })}
+                  placeholder="e.g. 49.99" />
+              </div>
             </div>
 
             {/* ── Bill of Materials ── */}
@@ -356,6 +366,9 @@ export default function Products() {
                 <span>📦</span>
                 <span>{prod.name}</span>
                 <span className="muted" style={{ fontWeight: 400 }}>— {prod.dailyCapacity} units/day</span>
+                {prod.sellingPrice != null && (
+                  <span className="muted" style={{ fontWeight: 400 }}>· £{prod.sellingPrice.toFixed(2)}/unit</span>
+                )}
                 {prod.finishedStock > 0 && (
                   <span className="badge badge-ok" style={{ marginLeft: 4 }}>
                     {prod.finishedStock} in stock

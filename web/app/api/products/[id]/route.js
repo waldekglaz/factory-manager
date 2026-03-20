@@ -16,7 +16,7 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   const { id } = await params;
   const numId = Number(id);
-  const { name, dailyCapacity, description, finishedStock, parts, locationStocks } =
+  const { name, dailyCapacity, description, finishedStock, sellingPrice, parts, locationStocks } =
     await request.json();
 
   const product = await prisma.$transaction(async (tx) => {
@@ -27,6 +27,7 @@ export async function PUT(request, { params }) {
         ...(dailyCapacity != null && { dailyCapacity: Number(dailyCapacity) }),
         ...(description   != null && { description }),
         ...(finishedStock != null && { finishedStock: Number(finishedStock) }),
+        ...(sellingPrice  != null && { sellingPrice: sellingPrice === "" ? null : Number(sellingPrice) }),
       },
     });
 

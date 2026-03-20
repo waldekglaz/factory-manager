@@ -51,6 +51,7 @@ export const api = {
     cancel:      (id)   => request("POST", `/orders/${id}/cancel`),
     workOrderUrl:    (id) => `${BASE}/orders/${id}/work-order`,
     deliveryNoteUrl: (id) => `${BASE}/orders/${id}/delivery-note`,
+    invoiceUrl:      (id) => `${BASE}/orders/${id}/invoice`,
   },
 
   customers: {

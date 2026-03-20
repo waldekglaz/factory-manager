@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  const { name, dailyCapacity, description, finishedStock, parts, locationStocks } =
+  const { name, dailyCapacity, description, finishedStock, sellingPrice, parts, locationStocks } =
     await request.json();
 
   if (!name || dailyCapacity == null) {
@@ -33,6 +33,7 @@ export async function POST(request) {
         dailyCapacity: Number(dailyCapacity),
         description:   description ?? "",
         finishedStock: Number(finishedStock ?? 0),
+        ...(sellingPrice != null && sellingPrice !== "" && { sellingPrice: Number(sellingPrice) }),
         productParts: {
           create: parts.map((p) => ({
             partId:           Number(p.partId),

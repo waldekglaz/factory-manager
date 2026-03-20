@@ -414,6 +414,14 @@ export default function Orders() {
                               </a>
                             </>
                           )}
+                          {order.status === "completed" && (
+                            <a className="btn btn-primary btn-sm"
+                              href={api.orders.invoiceUrl(order.id)}
+                              target="_blank" rel="noreferrer"
+                              title="Open printable invoice">
+                              Invoice
+                            </a>
+                          )}
                         </div>
                       </td>
                     </tr>

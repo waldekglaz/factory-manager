@@ -38,6 +38,7 @@ model Product {
   dailyCapacity  Int    // units of this product that can be made per working day
   description    String @default("")
   finishedStock  Int    @default(0) // units ready to ship (warehouse stock)
+  sellingPrice   Float?             // unit selling price (optional, used for invoices)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
