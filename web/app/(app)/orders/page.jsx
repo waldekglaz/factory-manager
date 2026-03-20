@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 /**
  * Orders page
  * - Place a new order (triggers the production planning algorithm)
@@ -44,6 +45,7 @@ export default function Orders() {
   const [expanded,  setExpanded]  = useState(null);
   const [error,     setError]     = useState("");
   const [success,   setSuccess]   = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const blank = { productId: "", customerId: "", quantity: 1, desiredDeadline: "", notes: "" };
   const [form,    setForm]    = useState(blank);
@@ -111,6 +113,7 @@ export default function Orders() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSubmitting(true);
     try {
       const order = await api.orders.create({
         productId:       Number(form.productId),
@@ -127,6 +130,8 @@ export default function Orders() {
       setTimeout(() => setSuccess(""), 5000);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -269,7 +274,7 @@ export default function Orders() {
             )}
 
             <div className="gap-2">
-              <button type="submit" className="btn btn-primary">Place Order</button>
+              <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? "Placing…" : "Place Order"}</button>
               <button type="button" className="btn btn-ghost" onClick={() => { setShowForm(false); setPreview(null); }}>Cancel</button>
             </div>
           </form>
@@ -304,8 +309,8 @@ export default function Orders() {
               </thead>
               <tbody>
                 {orders.map((order) => (
-                  <>
-                    <tr key={order.id}>
+                  <React.Fragment key={order.id}>
+                    <tr>
                       <td className="muted mono">#{order.id}</td>
                       <td className="bold">{order.product.name}</td>
                       <td className="muted">{order.customer?.name ?? "—"}</td>
@@ -390,7 +395,7 @@ export default function Orders() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

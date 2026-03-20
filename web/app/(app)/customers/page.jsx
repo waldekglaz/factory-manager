@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 
 function fmtDate(d) {
@@ -158,8 +158,8 @@ export default function Customers() {
             </thead>
             <tbody>
               {customers.map((c) => (
-                <>
-                  <tr key={c.id}>
+                <React.Fragment key={c.id}>
+                  <tr>
                     <td className="bold">{c.name}</td>
                     <td className="muted">{c.email ?? "—"}</td>
                     <td className="muted">{c.phone ?? "—"}</td>
@@ -206,7 +206,7 @@ export default function Customers() {
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>
