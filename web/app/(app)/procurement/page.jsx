@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 /**
  * Procurement page
  * Two sections: Suppliers (with parts they supply) and Purchase Orders.
@@ -288,8 +289,8 @@ function PurchaseOrdersSection() {
             </thead>
             <tbody>
               {pos.map((po) => (
-                <>
-                  <tr key={po.id}>
+                <React.Fragment key={po.id}>
+                  <tr>
                     <td className="muted mono">#{po.id}</td>
                     <td className="bold">{po.supplier.name}</td>
                     <td><span className={`badge ${PO_STATUS_COLORS[po.status] ?? ""}`}>{po.status}</span></td>
@@ -340,7 +341,7 @@ function PurchaseOrdersSection() {
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>
