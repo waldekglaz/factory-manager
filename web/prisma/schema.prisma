@@ -221,6 +221,7 @@ model SupplierPart {
   partId           Int
   unitCost         Float? // cost per unit from this supplier (optional)
   leadTimeOverride Int?   // overrides supplier.defaultLeadTime for this specific part
+  minimumOrderQty  Int?   // minimum quantity this supplier will ship for this part
 
   supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   part     Part     @relation(fields: [partId], references: [id], onDelete: Cascade)

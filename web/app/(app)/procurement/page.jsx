@@ -362,7 +362,7 @@ function SuppliersSection() {
   const [editing,   setEditing]   = useState(null);
   const [expanded,  setExpanded]  = useState(null);
   const [linkForm,  setLinkForm]  = useState(null); // supplierId being linked
-  const [linkData,  setLinkData]  = useState({ partId: "", unitCost: "", leadTimeOverride: "" });
+  const [linkData,  setLinkData]  = useState({ partId: "", unitCost: "", leadTimeOverride: "", minimumOrderQty: "" });
   const [error,     setError]     = useState("");
   const [success,   setSuccess]   = useState("");
 
@@ -433,9 +433,10 @@ function SuppliersSection() {
         partId:           Number(linkData.partId),
         unitCost:         linkData.unitCost           ? Number(linkData.unitCost)           : undefined,
         leadTimeOverride: linkData.leadTimeOverride   ? Number(linkData.leadTimeOverride)   : undefined,
+        minimumOrderQty:  linkData.minimumOrderQty    ? Number(linkData.minimumOrderQty)    : undefined,
       });
       setLinkForm(null);
-      setLinkData({ partId: "", unitCost: "", leadTimeOverride: "" });
+      setLinkData({ partId: "", unitCost: "", leadTimeOverride: "", minimumOrderQty: "" });
       await load();
     } catch (err) {
       setError(err.message);
@@ -536,13 +537,14 @@ function SuppliersSection() {
                   {s.supplierParts.length > 0 && (
                     <table style={{ marginBottom: 12 }}>
                       <thead>
-                        <tr><th>Part</th><th>Unit Cost</th><th>Lead Time Override</th><th></th></tr>
+                        <tr><th>Part</th><th>Unit Cost</th><th>Min. Order Qty</th><th>Lead Time Override</th><th></th></tr>
                       </thead>
                       <tbody>
                         {s.supplierParts.map((sp) => (
                           <tr key={sp.id}>
                             <td>{sp.part.name} ({sp.part.unit})</td>
-                            <td className="muted">{sp.unitCost != null ? `${sp.unitCost}` : "—"}</td>
+                            <td className="muted">{sp.unitCost != null ? `£${sp.unitCost}` : "—"}</td>
+                            <td className="muted">{sp.minimumOrderQty != null ? `${sp.minimumOrderQty} ${sp.part.unit}` : "—"}</td>
                             <td className="muted">
                               {sp.leadTimeOverride != null ? `${sp.leadTimeOverride}d` : `(default ${s.defaultLeadTime}d)`}
                             </td>
@@ -576,6 +578,13 @@ function SuppliersSection() {
                           style={{ width: 110 }} />
                       </div>
                       <div className="field" style={{ margin: 0 }}>
+                        <label style={{ fontSize: 11 }}>Min. Order Qty (optional)</label>
+                        <input type="number" min="1" placeholder="e.g. 100"
+                          value={linkData.minimumOrderQty}
+                          onChange={(e) => setLinkData({ ...linkData, minimumOrderQty: e.target.value })}
+                          style={{ width: 110 }} />
+                      </div>
+                      <div className="field" style={{ margin: 0 }}>
                         <label style={{ fontSize: 11 }}>Lead Time Override (days)</label>
                         <input type="number" min="1" placeholder={`default: ${s.defaultLeadTime}d`}
                           value={linkData.leadTimeOverride}
@@ -588,7 +597,7 @@ function SuppliersSection() {
                         Link Part
                       </button>
                       <button className="btn btn-ghost btn-sm"
-                        onClick={() => { setLinkForm(null); setLinkData({ partId: "", unitCost: "", leadTimeOverride: "" }); }}>
+                        onClick={() => { setLinkForm(null); setLinkData({ partId: "", unitCost: "", leadTimeOverride: "", minimumOrderQty: "" }); }}>
                         Cancel
                       </button>
                     </div>
