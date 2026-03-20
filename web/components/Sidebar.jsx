@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { createBrowserClient } from "@supabase/ssr";
 
 const NAV = [
   { to: "/dashboard",   icon: "🏠", label: "Dashboard"           },
@@ -15,6 +16,16 @@ const NAV = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
 
   return (
     <aside className="sidebar">
@@ -33,6 +44,10 @@ export default function Sidebar() {
           </Link>
         ))}
       </nav>
+      <button className="nav-link" onClick={handleLogout} style={{ marginTop: "auto", background: "none", border: "none", cursor: "pointer", width: "100%", textAlign: "left" }}>
+        <span className="nav-icon">🚪</span>
+        Log out
+      </button>
     </aside>
   );
 }
