@@ -12,10 +12,11 @@ async function request(method, path, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  const data = await res.json();
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = null; }
   if (!res.ok) {
-    const msg = data?.error || `HTTP ${res.status}`;
-    throw new Error(msg);
+    throw new Error(data?.error || `HTTP ${res.status}: ${text.slice(0, 200)}`);
   }
   return data;
 }
