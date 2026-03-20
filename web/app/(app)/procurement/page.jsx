@@ -91,10 +91,16 @@ function PurchaseOrdersSection() {
 
   useEffect(() => { load(); }, []);
 
+  const getMoq = (supplierId, partId) => {
+    const supplier = suppliers.find((s) => s.id === Number(supplierId));
+    return supplier?.supplierParts?.find((sp) => sp.partId === Number(partId))?.minimumOrderQty ?? null;
+  };
+
   const addLine = () => {
     const unused = parts.find((p) => !form.lines.some((l) => Number(l.partId) === p.id));
     if (!unused) return;
-    setForm((f) => ({ ...f, lines: [...f.lines, { partId: unused.id, quantityOrdered: 1 }] }));
+    const moq = getMoq(form.supplierId, unused.id) ?? 1;
+    setForm((f) => ({ ...f, lines: [...f.lines, { partId: unused.id, quantityOrdered: moq }] }));
   };
   const removeLine   = (idx) => setForm((f) => ({ ...f, lines: f.lines.filter((_, i) => i !== idx) }));
   const updateLine   = (idx, field, val) =>
@@ -104,6 +110,14 @@ function PurchaseOrdersSection() {
     e.preventDefault();
     setError("");
     if (form.lines.length === 0) { setError("Add at least one part line"); return; }
+    for (const line of form.lines) {
+      const moq = getMoq(form.supplierId, line.partId);
+      if (moq && Number(line.quantityOrdered) < moq) {
+        const part = parts.find((p) => p.id === Number(line.partId));
+        setError(`Minimum order quantity for "${part?.name}" is ${moq} ${part?.unit ?? "units"}`);
+        return;
+      }
+    }
     try {
       await api.purchaseOrders.create({
         supplierId:   Number(form.supplierId),
@@ -250,17 +264,29 @@ function PurchaseOrdersSection() {
                 <span />
               </div>
             )}
-            {form.lines.map((row, idx) => (
-              <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 120px auto", gap: 8, marginBottom: 8, alignItems: "center" }}>
-                <select value={row.partId}
-                  onChange={(e) => updateLine(idx, "partId", Number(e.target.value))}>
-                  {parts.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>)}
-                </select>
-                <input type="number" min="1" value={row.quantityOrdered}
-                  onChange={(e) => updateLine(idx, "quantityOrdered", e.target.value)} />
-                <button type="button" className="btn btn-danger btn-sm" onClick={() => removeLine(idx)}>✕</button>
-              </div>
-            ))}
+            {form.lines.map((row, idx) => {
+              const moq = getMoq(form.supplierId, row.partId);
+              const belowMoq = moq && Number(row.quantityOrdered) < moq;
+              return (
+                <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 120px auto", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                  <select value={row.partId}
+                    onChange={(e) => {
+                      const newMoq = getMoq(form.supplierId, e.target.value) ?? 1;
+                      updateLine(idx, "partId", Number(e.target.value));
+                      updateLine(idx, "quantityOrdered", Math.max(Number(row.quantityOrdered), newMoq));
+                    }}>
+                    {parts.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>)}
+                  </select>
+                  <div>
+                    <input type="number" min={moq ?? 1} value={row.quantityOrdered}
+                      style={{ width: "100%", borderColor: belowMoq ? "var(--danger, #dc2626)" : undefined }}
+                      onChange={(e) => updateLine(idx, "quantityOrdered", e.target.value)} />
+                    {moq && <div style={{ fontSize: 11, color: belowMoq ? "#dc2626" : "var(--muted)", marginTop: 2 }}>Min: {moq}</div>}
+                  </div>
+                  <button type="button" className="btn btn-danger btn-sm" onClick={() => removeLine(idx)}>✕</button>
+                </div>
+              );
+            })}
             <button type="button" className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }} onClick={addLine}>
               + Add Part
             </button>
