@@ -16,6 +16,9 @@ export default function Parts() {
   const [showForm, setShowForm]   = useState(false);
   const [error, setError]         = useState("");
   const [success, setSuccess]     = useState("");
+  const [search, setSearch]       = useState("");
+  const [stockFilter, setStockFilter] = useState("all"); // all | low | critical | ok
+  const [sortBy, setSortBy]       = useState("name-asc"); // name-asc | name-desc | stock-asc | stock-desc | lead-asc | lead-desc
 
   const blank = { name: "", minimumStock: "", supplierLeadTime: 7, unit: "pcs", locationStocks: [] };
   const [form, setForm] = useState(blank);
@@ -116,6 +119,24 @@ export default function Parts() {
   if (loading) return <div className="loading-page"><div className="spinner" /> Loading parts…</div>;
 
   const lowStock = parts.filter((p) => p.minimumStock && p.currentStock <= p.minimumStock);
+
+  const visibleParts = parts
+    .filter((p) => {
+      if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (stockFilter === "critical") return p.currentStock === 0;
+      if (stockFilter === "low")      return p.minimumStock && p.currentStock > 0 && p.currentStock <= p.minimumStock;
+      if (stockFilter === "ok")       return !p.minimumStock || p.currentStock > p.minimumStock;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "name-asc")    return a.name.localeCompare(b.name);
+      if (sortBy === "name-desc")   return b.name.localeCompare(a.name);
+      if (sortBy === "stock-asc")   return a.currentStock - b.currentStock;
+      if (sortBy === "stock-desc")  return b.currentStock - a.currentStock;
+      if (sortBy === "lead-asc")    return a.supplierLeadTime - b.supplierLeadTime;
+      if (sortBy === "lead-desc")   return b.supplierLeadTime - a.supplierLeadTime;
+      return 0;
+    });
 
   return (
     <div className="page">
@@ -228,6 +249,34 @@ export default function Parts() {
 
       {/* Parts table */}
       <div className="card mt-4">
+        <div style={{ display: "flex", gap: 10, padding: "12px 16px", borderBottom: "1px solid var(--border)", flexWrap: "wrap", alignItems: "center" }}>
+          <input
+            placeholder="Search parts…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ flex: "1 1 180px", minWidth: 0 }}
+          />
+          <select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)} style={{ flex: "0 0 auto" }}>
+            <option value="all">All stock levels</option>
+            <option value="critical">Critical (0 stock)</option>
+            <option value="low">Low stock</option>
+            <option value="ok">OK</option>
+          </select>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ flex: "0 0 auto" }}>
+            <option value="name-asc">Name A→Z</option>
+            <option value="name-desc">Name Z→A</option>
+            <option value="stock-asc">Stock ↑</option>
+            <option value="stock-desc">Stock ↓</option>
+            <option value="lead-asc">Lead time ↑</option>
+            <option value="lead-desc">Lead time ↓</option>
+          </select>
+          {(search || stockFilter !== "all") && (
+            <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(""); setStockFilter("all"); }}>
+              Clear
+            </button>
+          )}
+          <span className="muted" style={{ fontSize: 13 }}>{visibleParts.length} of {parts.length}</span>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
@@ -246,7 +295,12 @@ export default function Parts() {
                   <div className="empty"><div className="empty-icon">🔩</div><p>No parts yet. Create one above.</p></div>
                 </td></tr>
               )}
-              {parts.map((p) => (
+              {visibleParts.length === 0 && parts.length > 0 && (
+                <tr><td colSpan={6}>
+                  <div className="empty"><div className="empty-icon">🔍</div><p>No parts match your filters.</p></div>
+                </td></tr>
+              )}
+              {visibleParts.map((p) => (
                 <tr key={p.id}>
                   <td className="bold">{p.name}</td>
                   <td>

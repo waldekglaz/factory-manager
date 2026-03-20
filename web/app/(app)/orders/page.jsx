@@ -46,6 +46,9 @@ export default function Orders() {
   const [error,     setError]     = useState("");
   const [success,   setSuccess]   = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [search,     setSearch]     = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy,     setSortBy]     = useState("newest");
 
   const blank = { productId: "", customerId: "", quantity: 1, desiredDeadline: "", notes: "" };
   const [form,    setForm]    = useState(blank);
@@ -153,6 +156,23 @@ export default function Orders() {
   };
 
   if (loading) return <div className="loading-page"><div className="spinner" /> Loading orders…</div>;
+
+  const visibleOrders = orders
+    .filter((o) => {
+      if (statusFilter !== "all" && o.status !== statusFilter) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        return o.product.name.toLowerCase().includes(q) || o.customer?.name?.toLowerCase().includes(q);
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "newest")  return b.id - a.id;
+      if (sortBy === "oldest")  return a.id - b.id;
+      if (sortBy === "status")  return a.status.localeCompare(b.status);
+      if (sortBy === "product") return a.product.name.localeCompare(b.product.name);
+      return 0;
+    });
 
   return (
     <div className="page">
@@ -291,6 +311,33 @@ export default function Orders() {
         </div>
       ) : (
         <div className="card mt-4">
+          <div style={{ display: "flex", gap: 10, padding: "12px 16px", borderBottom: "1px solid var(--border)", flexWrap: "wrap", alignItems: "center" }}>
+            <input
+              placeholder="Search product or customer…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ flex: "1 1 200px", minWidth: 0 }}
+            />
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ flex: "0 0 auto" }}>
+              <option value="all">All statuses</option>
+              <option value="planned">Planned</option>
+              <option value="in_production">In production</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ flex: "0 0 auto" }}>
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="product">Product A→Z</option>
+              <option value="status">Status</option>
+            </select>
+            {(search || statusFilter !== "all") && (
+              <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(""); setStatusFilter("all"); }}>
+                Clear
+              </button>
+            )}
+            <span className="muted" style={{ fontSize: 13 }}>{visibleOrders.length} of {orders.length}</span>
+          </div>
           <div className="table-wrap">
             <table>
               <thead>
@@ -308,7 +355,12 @@ export default function Orders() {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((order) => (
+                {visibleOrders.length === 0 && (
+                  <tr><td colSpan={10}>
+                    <div className="empty"><div className="empty-icon">🔍</div><p>No orders match your filters.</p></div>
+                  </td></tr>
+                )}
+                {visibleOrders.map((order) => (
                   <React.Fragment key={order.id}>
                     <tr>
                       <td className="muted mono">#{order.id}</td>
