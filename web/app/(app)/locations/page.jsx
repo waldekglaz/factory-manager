@@ -232,7 +232,7 @@ export default function Locations() {
     : [];
 
   // ── render ────────────────────────────────────────────────────────────────
-  if (loading) return <p className="text-muted">Loading locations…</p>;
+  if (loading) return <div className="loading-page"><div className="spinner" /> Loading locations…</div>;
 
   return (
     <div className="page">
