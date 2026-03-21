@@ -35,7 +35,7 @@ export async function POST(request, { params }) {
   const receivedPartIds = new Set();
 
   await prisma.$transaction(async (tx) => {
-    for (const { lineId, quantityReceived } of lines) {
+    for (const { lineId, quantityReceived, locationId } of lines) {
       const qty = Number(quantityReceived);
       if (!qty || qty <= 0) continue;
 
@@ -56,6 +56,14 @@ export async function POST(request, { params }) {
       await tx.stockMovement.create({
         data: { partId: line.partId, quantity: toReceive, reason: `purchase_order_#${poId}` },
       });
+
+      if (locationId) {
+        await tx.partLocationStock.upsert({
+          where:  { partId_locationId: { partId: line.partId, locationId: Number(locationId) } },
+          update: { quantity: { increment: toReceive } },
+          create: { partId: line.partId, locationId: Number(locationId), quantity: toReceive },
+        });
+      }
 
       receivedPartIds.add(line.partId);
     }

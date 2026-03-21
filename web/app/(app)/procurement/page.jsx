@@ -68,6 +68,8 @@ function PurchaseOrdersSection() {
   const [expanded,  setExpanded]  = useState(null);
   const [receiving, setReceiving] = useState(null); // po being received
   const [recvQty,   setRecvQty]   = useState({});   // { lineId: qty }
+  const [recvLoc,   setRecvLoc]   = useState({});   // { lineId: locationId }
+  const [locations, setLocations] = useState([]);
   const [error,     setError]     = useState("");
   const [success,   setSuccess]   = useState("");
 
@@ -76,14 +78,16 @@ function PurchaseOrdersSection() {
 
   const load = async () => {
     try {
-      const [p, s, parts] = await Promise.all([
+      const [p, s, parts, locs] = await Promise.all([
         api.purchaseOrders.list(),
         api.suppliers.list(),
         api.parts.list(),
+        api.locations.list(),
       ]);
       setPos(p);
       setSuppliers(s);
       setParts(parts);
+      setLocations(locs);
     } finally {
       setLoading(false);
     }
@@ -138,18 +142,25 @@ function PurchaseOrdersSection() {
   const openReceive = (po) => {
     setReceiving(po);
     const qty = {};
+    const loc = {};
     po.lines.forEach((l) => {
       const remaining = l.quantityOrdered - l.quantityReceived;
       qty[l.id] = remaining > 0 ? remaining : 0;
+      loc[l.id] = "";
     });
     setRecvQty(qty);
+    setRecvLoc(loc);
   };
 
   const handleReceive = async () => {
     setError("");
     try {
       const lines = Object.entries(recvQty)
-        .map(([lineId, quantityReceived]) => ({ lineId: Number(lineId), quantityReceived: Number(quantityReceived) }))
+        .map(([lineId, quantityReceived]) => ({
+          lineId: Number(lineId),
+          quantityReceived: Number(quantityReceived),
+          ...(recvLoc[lineId] ? { locationId: Number(recvLoc[lineId]) } : {}),
+        }))
         .filter((l) => l.quantityReceived > 0);
 
       if (lines.length === 0) { setError("Enter at least one quantity to receive"); return; }
@@ -190,16 +201,16 @@ function PurchaseOrdersSection() {
       {/* ── Receive modal ── */}
       {receiving && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
-          <div style={{ background: "#fff", borderRadius: 10, padding: 28, width: 500, maxWidth: "95vw", boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}>
+          <div style={{ background: "#fff", borderRadius: 10, padding: 28, width: 660, maxWidth: "95vw", boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}>
             <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>
               Receive Delivery — PO #{receiving.id}
             </div>
             <div className="muted" style={{ fontSize: 12, marginBottom: 16 }}>
-              Enter quantities received. Stock will be updated and waiting orders recalculated.
+              Enter quantities received and optionally assign each part to a location.
             </div>
             <table style={{ marginBottom: 16 }}>
               <thead>
-                <tr><th>Part</th><th>Ordered</th><th>Already Received</th><th>Receive Now</th></tr>
+                <tr><th>Part</th><th>Ordered</th><th>Received</th><th>Receive Now</th><th>Location</th></tr>
               </thead>
               <tbody>
                 {receiving.lines.map((l) => {
@@ -217,6 +228,19 @@ function PurchaseOrdersSection() {
                           style={{ width: 80 }}
                           disabled={remaining <= 0}
                         />
+                      </td>
+                      <td>
+                        <select
+                          value={recvLoc[l.id] ?? ""}
+                          onChange={(e) => setRecvLoc({ ...recvLoc, [l.id]: e.target.value })}
+                          disabled={remaining <= 0}
+                          style={{ minWidth: 120 }}
+                        >
+                          <option value="">— none —</option>
+                          {locations.map((loc) => (
+                            <option key={loc.id} value={loc.id}>{loc.name}{loc.code ? ` (${loc.code})` : ""}</option>
+                          ))}
+                        </select>
                       </td>
                     </tr>
                   );
