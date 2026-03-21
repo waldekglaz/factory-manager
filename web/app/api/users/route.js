@@ -43,3 +43,28 @@ export async function GET() {
 
   return Response.json(users);
 }
+
+export async function POST(request) {
+  const callerRole = await getCallerRole();
+  if (callerRole !== "manager") {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { email, password, role } = await request.json();
+  if (!email || !password) {
+    return Response.json({ error: "Email and password are required" }, { status: 400 });
+  }
+  if (!["manager", "admin"].includes(role)) {
+    return Response.json({ error: "Invalid role" }, { status: 400 });
+  }
+
+  const { data, error } = await adminClient().auth.admin.createUser({
+    email,
+    password,
+    user_metadata: { role },
+    email_confirm: true,
+  });
+
+  if (error) return Response.json({ error: error.message }, { status: 500 });
+  return Response.json({ id: data.user.id, email: data.user.email, role });
+}
