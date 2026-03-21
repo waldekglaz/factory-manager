@@ -3,18 +3,22 @@ import { useState, useEffect } from "react";
 import { useRole } from "@/lib/role";
 import { useRouter } from "next/navigation";
 
+const blank = { email: "", password: "", role: "admin" };
+
 export default function UsersPage() {
   const role = useRole();
   const router = useRouter();
-  const [users,   setUsers]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving,  setSaving]  = useState({});  // { userId: true }
-  const [roles,   setRoles]   = useState({});  // { userId: role }
-  const [error,   setError]   = useState("");
-  const [success, setSuccess] = useState("");
+  const [users,     setUsers]     = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [saving,    setSaving]    = useState({});
+  const [roles,     setRoles]     = useState({});
+  const [showForm,  setShowForm]  = useState(false);
+  const [form,      setForm]      = useState(blank);
+  const [creating,  setCreating]  = useState(false);
+  const [error,     setError]     = useState("");
+  const [success,   setSuccess]   = useState("");
 
   useEffect(() => {
-    // Redirect admin away (middleware also blocks, this is a fallback)
     if (role === "admin") { router.push("/dashboard"); return; }
   }, [role, router]);
 
@@ -55,6 +59,29 @@ export default function UsersPage() {
     }
   };
 
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    setError("");
+    setCreating(true);
+    try {
+      const res = await fetch("/api/users", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(form),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setSuccess(`User ${form.email} created`);
+      setForm(blank);
+      setShowForm(false);
+      await load();
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
   if (loading) return <div className="loading-page"><div className="spinner" /> Loading users…</div>;
 
   return (
@@ -62,12 +89,52 @@ export default function UsersPage() {
       <div className="page-header">
         <div>
           <div className="page-title">Users</div>
-          <div className="page-subtitle">Manage user roles</div>
+          <div className="page-subtitle">{users.length} user{users.length !== 1 ? "s" : ""}</div>
         </div>
+        <button className="btn btn-primary" onClick={() => { setShowForm(true); setError(""); }}>
+          + New User
+        </button>
       </div>
 
       {error   && <div className="alert alert-error">{error}</div>}
       {success && <div className="alert alert-success">{success}</div>}
+
+      {showForm && (
+        <div className="card mt-4">
+          <div className="card-header">New User</div>
+          <form onSubmit={handleCreate} className="form">
+            <div className="form-row">
+              <div className="field">
+                <label>Email *</label>
+                <input required type="email" value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="user@example.com" />
+              </div>
+              <div className="field">
+                <label>Password *</label>
+                <input required type="password" value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder="min. 6 characters" minLength={6} />
+              </div>
+            </div>
+            <div className="field" style={{ maxWidth: 200 }}>
+              <label>Role *</label>
+              <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                <option value="manager">Manager</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div className="gap-2">
+              <button type="submit" className="btn btn-primary" disabled={creating}>
+                {creating ? "Creating…" : "Create User"}
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={() => { setShowForm(false); setForm(blank); }}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="card mt-4">
         <table>
