@@ -11,6 +11,7 @@ export default function UsersPage() {
   const [users,     setUsers]     = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [saving,    setSaving]    = useState({});
+  const [deleting,  setDeleting]  = useState({});
   const [roles,     setRoles]     = useState({});
   const [showForm,  setShowForm]  = useState(false);
   const [form,      setForm]      = useState(blank);
@@ -56,6 +57,23 @@ export default function UsersPage() {
       setError(err.message);
     } finally {
       setSaving((s) => ({ ...s, [userId]: false }));
+    }
+  };
+
+  const handleDelete = async (u) => {
+    if (!confirm(`Delete user "${u.email}"? This cannot be undone.`)) return;
+    setError("");
+    setDeleting((d) => ({ ...d, [u.id]: true }));
+    try {
+      const res = await fetch(`/api/users/${u.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setSuccess(`${u.email} deleted`);
+      await load();
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeleting((d) => ({ ...d, [u.id]: false }));
     }
   };
 
@@ -160,13 +178,22 @@ export default function UsersPage() {
                   </select>
                 </td>
                 <td>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    disabled={saving[u.id]}
-                    onClick={() => handleSave(u.id)}
-                  >
-                    {saving[u.id] ? "Saving…" : "Save"}
-                  </button>
+                  <div className="gap-2">
+                    <button
+                      className="btn btn-primary btn-sm"
+                      disabled={saving[u.id]}
+                      onClick={() => handleSave(u.id)}
+                    >
+                      {saving[u.id] ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      disabled={deleting[u.id]}
+                      onClick={() => handleDelete(u)}
+                    >
+                      {deleting[u.id] ? "Deleting…" : "Delete"}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

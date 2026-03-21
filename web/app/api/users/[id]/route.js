@@ -46,3 +46,31 @@ export async function PUT(request, { params }) {
   if (error) return Response.json({ error: error.message }, { status: 500 });
   return Response.json({ id, role });
 }
+
+export async function DELETE(request, { params }) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll: (cs) => cs.forEach(({ name, value, options }) => { try { cookieStore.set(name, value, options); } catch {} }),
+      },
+    }
+  );
+  const { data: { user: caller } } = await supabase.auth.getUser();
+  if ((caller?.user_metadata?.role ?? "manager") !== "manager") {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { id } = await params;
+
+  if (caller.id === id) {
+    return Response.json({ error: "You cannot delete your own account" }, { status: 400 });
+  }
+
+  const { error } = await adminClient().auth.admin.deleteUser(id);
+  if (error) return Response.json({ error: error.message }, { status: 500 });
+  return Response.json({ message: "User deleted" });
+}
