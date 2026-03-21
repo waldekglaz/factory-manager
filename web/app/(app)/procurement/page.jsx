@@ -6,6 +6,7 @@ import React from "react";
  */
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { useRole } from "@/lib/role";
 
 function fmtDate(d) {
   if (!d) return "—";
@@ -24,6 +25,7 @@ const PO_STATUS_COLORS = {
 //  TOP-LEVEL PAGE
 // ════════════════════════════════════════
 export default function Procurement() {
+  const role = useRole();
   const [tab, setTab] = useState("po"); // "po" | "suppliers"
 
   return (
@@ -42,16 +44,18 @@ export default function Procurement() {
         >
           Purchase Orders
         </button>
-        <button
-          className={`btn ${tab === "suppliers" ? "btn-primary" : "btn-ghost"}`}
-          onClick={() => setTab("suppliers")}
-        >
-          Suppliers
-        </button>
+        {role !== "admin" && (
+          <button
+            className={`btn ${tab === "suppliers" ? "btn-primary" : "btn-ghost"}`}
+            onClick={() => setTab("suppliers")}
+          >
+            Suppliers
+          </button>
+        )}
       </div>
 
-      {tab === "po"        && <PurchaseOrdersSection />}
-      {tab === "suppliers" && <SuppliersSection />}
+      {tab === "po"        && <PurchaseOrdersSection role={role} />}
+      {tab === "suppliers" && role !== "admin" && <SuppliersSection />}
     </div>
   );
 }
@@ -59,7 +63,7 @@ export default function Procurement() {
 // ════════════════════════════════════════
 //  PURCHASE ORDERS
 // ════════════════════════════════════════
-function PurchaseOrdersSection() {
+function PurchaseOrdersSection({ role }) {
   const [pos,       setPos]       = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [parts,     setParts]     = useState([]);
@@ -190,9 +194,11 @@ function PurchaseOrdersSection() {
   return (
     <>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <button className="btn btn-primary" onClick={() => { setShowForm(true); setError(""); }}>
-          + New Purchase Order
-        </button>
+        {role !== "admin" && (
+          <button className="btn btn-primary" onClick={() => { setShowForm(true); setError(""); }}>
+            + New Purchase Order
+          </button>
+        )}
       </div>
 
       {error   && <div className="alert alert-error">{error}</div>}
@@ -352,12 +358,12 @@ function PurchaseOrdersSection() {
                           onClick={() => setExpanded(expanded === po.id ? null : po.id)}>
                           {expanded === po.id ? "Hide" : "Details"}
                         </button>
-                        {po.status !== "received" && po.status !== "cancelled" && (
+                        {role !== "admin" && po.status !== "received" && po.status !== "cancelled" && (
                           <button className="btn btn-success btn-sm" onClick={() => openReceive(po)}>
                             Receive
                           </button>
                         )}
-                        {po.status !== "received" && po.status !== "cancelled" && (
+                        {role !== "admin" && po.status !== "received" && po.status !== "cancelled" && (
                           <button className="btn btn-danger btn-sm" onClick={() => cancel(po)}>Cancel</button>
                         )}
                       </div>

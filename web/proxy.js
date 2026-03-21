@@ -41,6 +41,15 @@ export async function proxy(request) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Role-based page access
+  const role = user.user_metadata?.role ?? "manager";
+  const ADMIN_BLOCKED = ["/parts", "/products", "/locations", "/schedule", "/users"];
+  if (role === "admin" && ADMIN_BLOCKED.some((p) => pathname.startsWith(p))) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
+
   return response;
 }
 

@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 
-const NAV = [
+const MANAGER_NAV = [
   { to: "/dashboard",   icon: "🏠", label: "Dashboard"           },
   { to: "/parts",       icon: "🔩", label: "Materials / Parts"   },
   { to: "/products",    icon: "📦", label: "Products"            },
@@ -13,6 +13,14 @@ const NAV = [
   { to: "/orders",      icon: "📋", label: "Orders"              },
   { to: "/procurement", icon: "🚚", label: "Procurement"         },
   { to: "/schedule",    icon: "📅", label: "Production Schedule" },
+  { to: "/users",       icon: "👤", label: "Users"               },
+];
+
+const ADMIN_NAV = [
+  { to: "/dashboard",   icon: "🏠", label: "Dashboard"   },
+  { to: "/customers",   icon: "👥", label: "Customers"   },
+  { to: "/orders",      icon: "📋", label: "Orders"      },
+  { to: "/procurement", icon: "🚚", label: "Procurement" },
 ];
 
 function getSupabase() {
@@ -26,6 +34,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const [role, setRole] = useState("manager");
 
   useEffect(() => {
     const supabase = getSupabase();
@@ -33,6 +42,8 @@ export default function Sidebar() {
 
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
+
+      setRole(user.user_metadata?.role ?? "manager");
 
       channel = supabase.channel("online-users");
       channel
@@ -57,13 +68,15 @@ export default function Sidebar() {
     router.push("/login");
   };
 
+  const nav = role === "admin" ? ADMIN_NAV : MANAGER_NAV;
+
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
         Factory <span>Manager</span>
       </div>
       <nav className="sidebar-nav">
-        {NAV.map(({ to, icon, label }) => (
+        {nav.map(({ to, icon, label }) => (
           <Link
             key={to}
             href={to}

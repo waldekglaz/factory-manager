@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { useRole } from "@/lib/role";
 
 function fmtDate(d) {
   if (!d) return "—";
@@ -8,6 +9,7 @@ function fmtDate(d) {
 }
 
 export default function Customers() {
+  const role = useRole();
   const [customers, setCustomers] = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [showForm,  setShowForm]  = useState(false);
@@ -95,7 +97,9 @@ export default function Customers() {
           <div className="page-title">Customers</div>
           <div className="page-subtitle">{customers.length} customers</div>
         </div>
-        <button className="btn btn-primary" onClick={openCreate}>+ New Customer</button>
+        {role !== "admin" && (
+          <button className="btn btn-primary" onClick={openCreate}>+ New Customer</button>
+        )}
       </div>
 
       {error   && <div className="alert alert-error">{error}</div>}
@@ -170,10 +174,12 @@ export default function Customers() {
                       </button>
                     </td>
                     <td>
-                      <div className="gap-2">
-                        <button className="btn btn-ghost btn-sm" onClick={() => openEdit(c)}>Edit</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(c)}>Delete</button>
-                      </div>
+                      {role !== "admin" && (
+                        <div className="gap-2">
+                          <button className="btn btn-ghost btn-sm" onClick={() => openEdit(c)}>Edit</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(c)}>Delete</button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                   {expanded === c.id && (

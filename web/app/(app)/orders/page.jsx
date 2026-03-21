@@ -9,6 +9,7 @@ import React from "react";
  */
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { useRole } from "@/lib/role";
 
 const STATUS_ACTIONS = {
   planned:       ["start", "cancel"],
@@ -37,6 +38,7 @@ function addWorkingDaysClient(date, n) {
 }
 
 export default function Orders() {
+  const role = useRole();
   const [orders,    setOrders]    = useState([]);
   const [products,  setProducts]  = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -182,16 +184,18 @@ export default function Orders() {
             {orders.length} total · {orders.filter((o) => o.status === "in_production").length} in production
           </div>
         </div>
-        <button className="btn btn-primary" onClick={() => { setShowForm(true); setError(""); }}>
-          + Place Order
-        </button>
+        {role !== "admin" && (
+          <button className="btn btn-primary" onClick={() => { setShowForm(true); setError(""); }}>
+            + Place Order
+          </button>
+        )}
       </div>
 
       {error   && <div className="alert alert-error">{error}</div>}
       {success && <div className="alert alert-success">{success}</div>}
 
       {/* ── New Order Form ── */}
-      {showForm && (
+      {showForm && role !== "admin" && (
         <div className="card mt-4">
           <div className="card-header">Place New Order</div>
           <form onSubmit={handleSubmit} className="form">
@@ -382,13 +386,13 @@ export default function Orders() {
                             onClick={() => setExpanded(expanded === order.id ? null : order.id)}>
                             {expanded === order.id ? "Hide" : "Details"}
                           </button>
-                          {STATUS_ACTIONS[order.status]?.includes("start") && (
+                          {role !== "admin" && STATUS_ACTIONS[order.status]?.includes("start") && (
                             <button className="btn btn-success btn-sm" onClick={() => doAction(order, "start")}>Start</button>
                           )}
-                          {STATUS_ACTIONS[order.status]?.includes("complete") && (
+                          {role !== "admin" && STATUS_ACTIONS[order.status]?.includes("complete") && (
                             <button className="btn btn-primary btn-sm" onClick={() => doAction(order, "complete")}>Complete</button>
                           )}
-                          {STATUS_ACTIONS[order.status]?.includes("cancel") && (
+                          {role !== "admin" && STATUS_ACTIONS[order.status]?.includes("cancel") && (
                             <button className="btn btn-danger btn-sm" onClick={() => doAction(order, "cancel")}>Cancel</button>
                           )}
                           {/* Print buttons — available for all non-cancelled orders */}
