@@ -20,7 +20,7 @@ const BASE_CSS = `
   .notes { padding: 12px; border: 1px solid #ddd; border-radius: 4px; min-height: 60px; font-size: 12px; color: #444; margin-bottom: 20px; }
   .signature-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 30px; margin-top: 40px; }
   .sig-box { border-top: 1px solid #999; padding-top: 8px; font-size: 11px; color: #666; }
-  @media print { body { padding: 15px 20px; } @page { margin: 1cm; } .no-print { display: none !important; } }
+  @media print { body { padding: 15px 20px; } @page { margin: 1cm; size: A4 portrait; } .no-print { display: none !important; } }
 `;
 
 export async function GET(request, { params }) {
@@ -38,7 +38,9 @@ export async function GET(request, { params }) {
   <button onclick="window.print()" style="background:#111;color:#fff;border:none;padding:8px 18px;border-radius:4px;cursor:pointer;font-size:13px;">Print / Save PDF</button>
 </div>
 <div class="header">
-  <div><div class="label">Delivery Note</div><h1>#${order.id}</h1><div style="margin-top:4px;color:#555;">Date: ${fmtDate(new Date())}</div></div>
+  <div>
+    <img src="https://dtsolutionsltd.co.uk/wp-content/uploads/2023/03/DTS_logo_inc_ltd.png" alt="DTS Solutions" style="height:55px;margin-bottom:12px;display:block;">
+    <div class="label">Delivery Note</div><h1>#${order.id}</h1><div style="margin-top:4px;color:#555;">Date: ${fmtDate(new Date())}</div></div>
   <div class="header-right"><div class="label">Reference</div><div class="value">ORDER-${String(order.id).padStart(4, "0")}</div></div>
 </div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:24px;">

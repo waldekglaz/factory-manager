@@ -25,7 +25,7 @@ const BASE_CSS = `
   .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
   .badge-missing { background: #fee2e2; color: #b91c1c; }
   .badge-ok { background: #dcfce7; color: #15803d; }
-  @media print { body { padding: 15px 20px; } @page { margin: 1cm; } .no-print { display: none !important; } }
+  @media print { body { padding: 15px 20px; } @page { margin: 1cm; size: A4 portrait; } .no-print { display: none !important; } }
 `;
 
 export async function GET(request, { params }) {
@@ -61,7 +61,9 @@ export async function GET(request, { params }) {
   <button onclick="window.print()" style="background:#111;color:#fff;border:none;padding:8px 18px;border-radius:4px;cursor:pointer;font-size:13px;">Print / Save PDF</button>
 </div>
 <div class="header">
-  <div><div class="label">Work Order</div><h1>#${order.id} — ${order.product.name}</h1><div style="margin-top:4px;color:#555;">Issued: ${fmtDate(new Date())}</div></div>
+  <div>
+    <img src="https://dtsolutionsltd.co.uk/wp-content/uploads/2023/03/DTS_logo_inc_ltd.png" alt="DTS Solutions" style="height:55px;margin-bottom:12px;display:block;">
+    <div class="label">Work Order</div><h1>#${order.id} — ${order.product.name}</h1><div style="margin-top:4px;color:#555;">Issued: ${fmtDate(new Date())}</div></div>
   <div class="header-right">
     <div class="label">Status</div><div class="value">${order.status.replace("_", " ").toUpperCase()}</div>
     ${order.customer ? `<div style="margin-top:8px;"><div class="label">Customer</div><div class="value">${order.customer.name}</div></div>` : ""}

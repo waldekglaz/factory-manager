@@ -30,7 +30,7 @@ const BASE_CSS = `
   .totals .total-row td { border-top: 2px solid #111; font-weight: 700; font-size: 15px; padding-top: 8px; }
   .notes { padding: 12px; border: 1px solid #ddd; border-radius: 4px; min-height: 40px; font-size: 12px; color: #444; }
   .footer { margin-top: 40px; font-size: 11px; color: #888; text-align: center; border-top: 1px solid #eee; padding-top: 12px; }
-  @media print { body { padding: 15px 20px; } @page { margin: 1cm; } .no-print { display: none !important; } }
+  @media print { body { padding: 15px 20px; } @page { margin: 1cm; size: A4 portrait; } .no-print { display: none !important; } }
 `;
 
 export async function GET(request, { params }) {
@@ -89,6 +89,7 @@ export async function GET(request, { params }) {
 </div>
 <div class="header">
   <div>
+    <img src="https://dtsolutionsltd.co.uk/wp-content/uploads/2023/03/DTS_logo_inc_ltd.png" alt="DTS Solutions" style="height:55px;margin-bottom:12px;display:block;">
     <div class="label">Invoice</div>
     <h1>${invoiceNo}</h1>
     <div style="margin-top:4px;color:#555;">Date: ${invoiceDate}</div>

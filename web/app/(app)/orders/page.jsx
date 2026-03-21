@@ -4,14 +4,14 @@ import React from "react";
  * Orders page
  * - Place a new order (triggers the production planning algorithm)
  * - List all orders with their calculated production window
- * - Start production, complete, cancel, recalculate
+ * - Start production, complete, cancel
  * - Print work order / delivery note
  */
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 
 const STATUS_ACTIONS = {
-  planned:       ["recalculate", "start", "cancel"],
+  planned:       ["start", "cancel"],
   in_production: ["complete", "cancel"],
   completed:     [],
   cancelled:     [],
@@ -140,12 +140,11 @@ export default function Orders() {
 
   const doAction = async (order, action) => {
     setError("");
-    const labels = { start: "Start production", recalculate: "Recalculate plan", complete: "Complete", cancel: "Cancel" };
+    const labels = { start: "Start production", complete: "Complete", cancel: "Cancel" };
     if (!confirm(`${labels[action]} order #${order.id} — "${order.product.name}"?`)) return;
     try {
-      if (action === "start")       await api.orders.start(order.id);
-      if (action === "recalculate") await api.orders.recalculate(order.id);
-      if (action === "complete")    await api.orders.complete(order.id);
+      if (action === "start")    await api.orders.start(order.id);
+      if (action === "complete") await api.orders.complete(order.id);
       if (action === "cancel")      await api.orders.cancel(order.id);
       setSuccess(`Order #${order.id} updated`);
       await load();
@@ -383,11 +382,6 @@ export default function Orders() {
                             onClick={() => setExpanded(expanded === order.id ? null : order.id)}>
                             {expanded === order.id ? "Hide" : "Details"}
                           </button>
-                          {STATUS_ACTIONS[order.status]?.includes("recalculate") && (
-                            <button className="btn btn-ghost btn-sm" onClick={() => doAction(order, "recalculate")} title="Re-run planning with current stock">
-                              Recalculate
-                            </button>
-                          )}
                           {STATUS_ACTIONS[order.status]?.includes("start") && (
                             <button className="btn btn-success btn-sm" onClick={() => doAction(order, "start")}>Start</button>
                           )}
