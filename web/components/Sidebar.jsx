@@ -23,6 +23,12 @@ const ADMIN_NAV = [
   { to: "/procurement", icon: "🚚", label: "Procurement" },
 ];
 
+const DISPATCHER_NAV = [
+  { to: "/dashboard",   icon: "🏠", label: "Dashboard"   },
+  { to: "/orders",      icon: "📋", label: "Orders"      },
+  { to: "/procurement", icon: "🚚", label: "Procurement" },
+];
+
 function getSupabase() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -68,7 +74,7 @@ export default function Sidebar() {
     router.push("/login");
   };
 
-  const nav = role === "admin" ? ADMIN_NAV : MANAGER_NAV;
+  const nav = role === "admin" ? ADMIN_NAV : role === "dispatcher" ? DISPATCHER_NAV : MANAGER_NAV;
 
   return (
     <aside className="sidebar">

@@ -35,7 +35,7 @@ export async function PUT(request, { params }) {
   const { id } = await params;
   const { role } = await request.json();
 
-  if (!["manager", "admin"].includes(role)) {
+  if (!["manager", "admin", "dispatcher"].includes(role)) {
     return Response.json({ error: "Invalid role" }, { status: 400 });
   }
 

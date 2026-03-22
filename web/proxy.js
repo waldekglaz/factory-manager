@@ -49,6 +49,12 @@ export async function proxy(request) {
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
+  const DISPATCHER_BLOCKED = ["/parts", "/products", "/locations", "/schedule", "/users", "/customers"];
+  if (role === "dispatcher" && DISPATCHER_BLOCKED.some((p) => pathname.startsWith(p))) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
 
   return response;
 }

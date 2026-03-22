@@ -140,6 +140,7 @@ export default function UsersPage() {
               <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
                 <option value="manager">Manager</option>
                 <option value="admin">Admin</option>
+                <option value="dispatcher">Dispatcher</option>
               </select>
             </div>
             <div className="gap-2">
@@ -175,6 +176,7 @@ export default function UsersPage() {
                   >
                     <option value="manager">Manager</option>
                     <option value="admin">Admin</option>
+                    <option value="dispatcher">Dispatcher</option>
                   </select>
                 </td>
                 <td>
@@ -203,7 +205,8 @@ export default function UsersPage() {
 
       <div className="card mt-4" style={{ padding: 16, fontSize: 13, color: "var(--muted)" }}>
         <strong>Manager</strong> — full access to all pages and actions.<br />
-        <strong>Admin</strong> — view orders, customers, procurement, and print documents. Cannot create or edit products, parts, locations, suppliers, or purchase orders.
+        <strong>Admin</strong> — view orders, customers, procurement, and print documents. Cannot create or edit products, parts, locations, suppliers, or purchase orders.<br />
+        <strong>Dispatcher</strong> — can receive goods and complete orders. Views dashboard, orders, and procurement. Cannot access customers, parts, products, locations, or suppliers.
       </div>
     </div>
   );

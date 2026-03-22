@@ -54,7 +54,7 @@ export async function POST(request) {
   if (!email || !password) {
     return Response.json({ error: "Email and password are required" }, { status: 400 });
   }
-  if (!["manager", "admin"].includes(role)) {
+  if (!["manager", "admin", "dispatcher"].includes(role)) {
     return Response.json({ error: "Invalid role" }, { status: 400 });
   }
 

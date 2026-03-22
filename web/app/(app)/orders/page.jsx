@@ -184,7 +184,7 @@ export default function Orders() {
             {orders.length} total · {orders.filter((o) => o.status === "in_production").length} in production
           </div>
         </div>
-        {role !== "admin" && (
+        {role === "manager" && (
           <button className="btn btn-primary" onClick={() => { setShowForm(true); setError(""); }}>
             + Place Order
           </button>
@@ -195,7 +195,7 @@ export default function Orders() {
       {success && <div className="alert alert-success">{success}</div>}
 
       {/* ── New Order Form ── */}
-      {showForm && role !== "admin" && (
+      {showForm && role === "manager" && (
         <div className="card mt-4">
           <div className="card-header">Place New Order</div>
           <form onSubmit={handleSubmit} className="form">
@@ -386,13 +386,13 @@ export default function Orders() {
                             onClick={() => setExpanded(expanded === order.id ? null : order.id)}>
                             {expanded === order.id ? "Hide" : "Details"}
                           </button>
-                          {role !== "admin" && STATUS_ACTIONS[order.status]?.includes("start") && (
+                          {role === "manager" && STATUS_ACTIONS[order.status]?.includes("start") && (
                             <button className="btn btn-success btn-sm" onClick={() => doAction(order, "start")}>Start</button>
                           )}
-                          {role !== "admin" && STATUS_ACTIONS[order.status]?.includes("complete") && (
+                          {(role === "manager" || role === "dispatcher") && STATUS_ACTIONS[order.status]?.includes("complete") && (
                             <button className="btn btn-primary btn-sm" onClick={() => doAction(order, "complete")}>Complete</button>
                           )}
-                          {role !== "admin" && STATUS_ACTIONS[order.status]?.includes("cancel") && (
+                          {role === "manager" && STATUS_ACTIONS[order.status]?.includes("cancel") && (
                             <button className="btn btn-danger btn-sm" onClick={() => doAction(order, "cancel")}>Cancel</button>
                           )}
                           {/* Print buttons — available for all non-cancelled orders */}
@@ -412,7 +412,7 @@ export default function Orders() {
                               </a>
                             </>
                           )}
-                          {order.status === "completed" && (
+                          {order.status === "completed" && role !== "dispatcher" && (
                             <a className="btn btn-primary btn-sm"
                               href={api.orders.invoiceUrl(order.id)}
                               target="_blank" rel="noreferrer"

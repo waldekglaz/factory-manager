@@ -44,7 +44,7 @@ export default function Procurement() {
         >
           Purchase Orders
         </button>
-        {role !== "admin" && (
+        {role === "manager" && (
           <button
             className={`btn ${tab === "suppliers" ? "btn-primary" : "btn-ghost"}`}
             onClick={() => setTab("suppliers")}
@@ -55,7 +55,7 @@ export default function Procurement() {
       </div>
 
       {tab === "po"        && <PurchaseOrdersSection role={role} />}
-      {tab === "suppliers" && role !== "admin" && <SuppliersSection />}
+      {tab === "suppliers" && role === "manager" && <SuppliersSection />}
     </div>
   );
 }
@@ -194,7 +194,7 @@ function PurchaseOrdersSection({ role }) {
   return (
     <>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        {role !== "admin" && (
+        {role === "manager" && (
           <button className="btn btn-primary" onClick={() => { setShowForm(true); setError(""); }}>
             + New Purchase Order
           </button>
@@ -358,12 +358,12 @@ function PurchaseOrdersSection({ role }) {
                           onClick={() => setExpanded(expanded === po.id ? null : po.id)}>
                           {expanded === po.id ? "Hide" : "Details"}
                         </button>
-                        {role !== "admin" && po.status !== "received" && po.status !== "cancelled" && (
+                        {(role === "manager" || role === "dispatcher") && po.status !== "received" && po.status !== "cancelled" && (
                           <button className="btn btn-success btn-sm" onClick={() => openReceive(po)}>
                             Receive
                           </button>
                         )}
-                        {role !== "admin" && po.status !== "received" && po.status !== "cancelled" && (
+                        {role === "manager" && po.status !== "received" && po.status !== "cancelled" && (
                           <button className="btn btn-danger btn-sm" onClick={() => cancel(po)}>Cancel</button>
                         )}
                       </div>
