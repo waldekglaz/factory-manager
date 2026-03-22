@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Dispatcher",
+    "slug": "dispatcher",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "dispatcher",
+    "userInterfaceStyle": "light",
+    "platforms": ["ios", "android"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.dts.dispatcher"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#2563eb"
+      },
+      "package": "com.dts.dispatcher"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
