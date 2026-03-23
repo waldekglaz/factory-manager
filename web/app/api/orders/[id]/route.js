@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { requireAuth, ALL_ROLES } from "@/lib/auth";
 
 const PRODUCT_WITH_BOM = {
   productParts: {
@@ -14,6 +15,9 @@ const PRODUCT_WITH_BOM = {
 };
 
 export async function GET(request, { params }) {
+  const auth = await requireAuth(request, ALL_ROLES);
+  if (auth.error) return auth.error;
+
   const { id } = await params;
   const order = await prisma.order.findUnique({
     where:   { id: Number(id) },

@@ -1,6 +1,10 @@
 import prisma from "@/lib/prisma";
+import { requireAuth, MANAGER_ADMIN, MANAGER_ONLY } from "@/lib/auth";
 
 export async function GET(request, { params }) {
+  const auth = await requireAuth(request, MANAGER_ADMIN);
+  if (auth.error) return auth.error;
+
   const { id } = await params;
   const customer = await prisma.customer.findUnique({ where: { id: Number(id) } });
   if (!customer) return Response.json({ error: "Customer not found" }, { status: 404 });
@@ -8,6 +12,9 @@ export async function GET(request, { params }) {
 }
 
 export async function PUT(request, { params }) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
+
   const { id } = await params;
   const { name, email, phone, address, notes } = await request.json();
 
@@ -25,6 +32,9 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
+
   const { id } = await params;
   const numId = Number(id);
 

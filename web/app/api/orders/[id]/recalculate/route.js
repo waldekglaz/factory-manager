@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { calculateProductionPlan } from "@/lib/productionPlanner";
+import { requireAuth, MANAGER_ONLY } from "@/lib/auth";
 
 const PRODUCT_WITH_BOM = {
   productParts: {
@@ -15,6 +16,9 @@ const PRODUCT_WITH_BOM = {
 };
 
 export async function POST(request, { params }) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
+
   const { id } = await params;
   const numId = Number(id);
 

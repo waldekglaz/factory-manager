@@ -1,6 +1,9 @@
 import prisma from "@/lib/prisma";
+import { requireAuth, MANAGER_ONLY } from "@/lib/auth";
 
 export async function PUT(request, { params }) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
   const { id } = await params;
   const { name, email, phone, defaultLeadTime, notes } = await request.json();
 
@@ -18,6 +21,9 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
+
   const { id } = await params;
   const numId = Number(id);
 

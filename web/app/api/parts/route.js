@@ -1,6 +1,9 @@
 import prisma from "@/lib/prisma";
+import { requireAuth, MANAGER_ONLY } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
   const parts = await prisma.part.findMany({
     orderBy: { name: "asc" },
     include: {
@@ -16,6 +19,9 @@ export async function GET() {
 }
 
 export async function POST(request) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
+
   const { name, currentStock, minimumStock, supplierLeadTime, unit, locationStocks } =
     await request.json();
 

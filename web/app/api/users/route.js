@@ -1,22 +1,5 @@
-import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
-
-async function getCallerRole() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: (cs) => cs.forEach(({ name, value, options }) => { try { cookieStore.set(name, value, options); } catch {} }),
-      },
-    }
-  );
-  const { data: { user } } = await supabase.auth.getUser();
-  return user?.user_metadata?.role ?? "manager";
-}
+import { requireAuth, MANAGER_ONLY } from "@/lib/auth";
 
 function adminClient() {
   return createClient(
@@ -26,14 +9,12 @@ function adminClient() {
   );
 }
 
-export async function GET() {
-  const callerRole = await getCallerRole();
-  if (callerRole !== "manager") {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
-  }
+export async function GET(request) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
 
   const { data, error } = await adminClient().auth.admin.listUsers();
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "Failed to list users" }, { status: 500 });
 
   const users = data.users.map((u) => ({
     id:    u.id,
@@ -45,10 +26,8 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  const callerRole = await getCallerRole();
-  if (callerRole !== "manager") {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
 
   const { email, password, role } = await request.json();
   if (!email || !password) {
@@ -65,6 +44,6 @@ export async function POST(request) {
     email_confirm: true,
   });
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "Failed to create user" }, { status: 500 });
   return Response.json({ id: data.user.id, email: data.user.email, role });
 }

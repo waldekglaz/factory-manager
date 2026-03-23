@@ -1,6 +1,9 @@
 import prisma from "@/lib/prisma";
+import { requireAuth, ALL_ROLES, MANAGER_ONLY } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request) {
+  const auth = await requireAuth(request, ALL_ROLES);
+  if (auth.error) return auth.error;
   const orders = await prisma.purchaseOrder.findMany({
     orderBy: { createdAt: "desc" },
     include: { supplier: true, lines: { include: { part: true } } },
@@ -9,6 +12,9 @@ export async function GET() {
 }
 
 export async function POST(request) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
+
   const { supplierId, expectedDate, notes, lines } = await request.json();
   if (!supplierId) return Response.json({ error: "supplierId is required" }, { status: 400 });
   if (!lines || lines.length === 0) {

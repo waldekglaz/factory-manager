@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { requireAuth, MANAGER_ADMIN } from "@/lib/auth";
 
 function fmtDate(d) {
   if (!d) return "—";
@@ -34,6 +35,9 @@ const BASE_CSS = `
 `;
 
 export async function GET(request, { params }) {
+  const auth = await requireAuth(request, MANAGER_ADMIN);
+  if (auth.error) return auth.error;
+
   const { id } = await params;
   const order = await prisma.order.findUnique({
     where:   { id: Number(id) },

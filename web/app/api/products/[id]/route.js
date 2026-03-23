@@ -1,6 +1,10 @@
 import prisma from "@/lib/prisma";
+import { requireAuth, MANAGER_ONLY } from "@/lib/auth";
 
 export async function GET(request, { params }) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
+
   const { id } = await params;
   const product = await prisma.product.findUnique({
     where:   { id: Number(id) },
@@ -14,6 +18,9 @@ export async function GET(request, { params }) {
 }
 
 export async function PUT(request, { params }) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
+
   const { id } = await params;
   const numId = Number(id);
   const { name, dailyCapacity, description, finishedStock, sellingPrice, parts, locationStocks } =
@@ -71,6 +78,9 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
+
   const { id } = await params;
   const numId = Number(id);
 

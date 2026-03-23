@@ -1,6 +1,10 @@
 import prisma from "@/lib/prisma";
+import { requireAuth, MANAGER_DISPATCHER } from "@/lib/auth";
 
 export async function POST(request, { params }) {
+  const auth = await requireAuth(request, MANAGER_DISPATCHER);
+  if (auth.error) return auth.error;
+
   const { id } = await params;
   const numId = Number(id);
 

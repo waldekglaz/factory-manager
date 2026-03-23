@@ -1,6 +1,10 @@
 import prisma from "@/lib/prisma";
+import { requireAuth, ALL_ROLES, MANAGER_ONLY } from "@/lib/auth";
 
 export async function GET(request, { params }) {
+  const auth = await requireAuth(request, ALL_ROLES);
+  if (auth.error) return auth.error;
+
   const { id } = await params;
   const po = await prisma.purchaseOrder.findUnique({
     where:   { id: Number(id) },
@@ -11,6 +15,9 @@ export async function GET(request, { params }) {
 }
 
 export async function PUT(request, { params }) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
+
   const { id } = await params;
   const { status, expectedDate, notes } = await request.json();
 

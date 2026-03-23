@@ -1,6 +1,9 @@
 import prisma from "@/lib/prisma";
+import { requireAuth, ALL_ROLES } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request) {
+  const auth = await requireAuth(request, ALL_ROLES);
+  if (auth.error) return auth.error;
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
 

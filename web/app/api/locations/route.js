@@ -1,6 +1,9 @@
 import prisma from "@/lib/prisma";
+import { requireAuth, MANAGER_ONLY } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
   const locations = await prisma.location.findMany({
     orderBy: { name: "asc" },
     include: {
@@ -22,6 +25,9 @@ export async function GET() {
 }
 
 export async function POST(request) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
+
   const { name, code, description, isRemote, deliveryDays } = await request.json();
   if (!name) return Response.json({ error: "name is required" }, { status: 400 });
 

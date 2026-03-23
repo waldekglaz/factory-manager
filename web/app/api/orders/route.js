@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { calculateProductionPlan } from "@/lib/productionPlanner";
+import { requireAuth, ALL_ROLES, MANAGER_ONLY } from "@/lib/auth";
 
 const PRODUCT_WITH_BOM = {
   productParts: {
@@ -14,7 +15,10 @@ const PRODUCT_WITH_BOM = {
   },
 };
 
-export async function GET() {
+export async function GET(request) {
+  const auth = await requireAuth(request, ALL_ROLES);
+  if (auth.error) return auth.error;
+
   const orders = await prisma.order.findMany({
     orderBy: { createdAt: "desc" },
     include: {
@@ -27,6 +31,9 @@ export async function GET() {
 }
 
 export async function POST(request) {
+  const auth = await requireAuth(request, MANAGER_ONLY);
+  if (auth.error) return auth.error;
+
   const { productId, customerId, quantity, desiredDeadline, notes } = await request.json();
 
   if (!productId || !quantity) {
