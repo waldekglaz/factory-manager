@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRole } from "@/lib/role";
 import { useRouter } from "next/navigation";
 
@@ -18,6 +18,7 @@ export default function UsersPage() {
   const [creating,  setCreating]  = useState(false);
   const [error,     setError]     = useState("");
   const [success,   setSuccess]   = useState("");
+  const successTimer = useRef(null);
 
   useEffect(() => {
     if (role === "admin") { router.push("/dashboard"); return; }
@@ -52,7 +53,8 @@ export default function UsersPage() {
       });
       if (!res.ok) throw new Error((await res.json()).error);
       setSuccess("Role updated");
-      setTimeout(() => setSuccess(""), 3000);
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -69,7 +71,8 @@ export default function UsersPage() {
       if (!res.ok) throw new Error((await res.json()).error);
       setSuccess(`${u.email} deleted`);
       await load();
-      setTimeout(() => setSuccess(""), 3000);
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -92,7 +95,8 @@ export default function UsersPage() {
       setForm(blank);
       setShowForm(false);
       await load();
-      setTimeout(() => setSuccess(""), 4000);
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 4000);
     } catch (err) {
       setError(err.message);
     } finally {

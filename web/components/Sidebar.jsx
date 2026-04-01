@@ -40,7 +40,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [onlineUsers, setOnlineUsers] = useState([]);
-  const [role, setRole] = useState("manager");
+  const [role, setRole] = useState(null);
 
   useEffect(() => {
     const supabase = getSupabase();
@@ -74,7 +74,7 @@ export default function Sidebar() {
     router.push("/login");
   };
 
-  const nav = role === "admin" ? ADMIN_NAV : role === "dispatcher" ? DISPATCHER_NAV : MANAGER_NAV;
+  const nav = role === null ? [] : role === "admin" ? ADMIN_NAV : role === "dispatcher" ? DISPATCHER_NAV : MANAGER_NAV;
 
   return (
     <aside className="sidebar">
@@ -100,8 +100,8 @@ export default function Sidebar() {
             <span style={{ color: "#22c55e", marginRight: 4 }}>●</span>
             {onlineUsers.length} online
           </div>
-          {onlineUsers.map((u, i) => (
-            <div key={i} style={{ fontSize: 12, color: "var(--muted)", padding: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {onlineUsers.map((u) => (
+            <div key={u.email} style={{ fontSize: 12, color: "var(--muted)", padding: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {u.email?.split("@")[0]}
             </div>
           ))}

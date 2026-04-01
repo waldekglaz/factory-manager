@@ -5,7 +5,7 @@
  * - Create new part / edit existing
  * - Low-stock warnings
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 
 export default function Parts() {
@@ -16,6 +16,7 @@ export default function Parts() {
   const [showForm, setShowForm]   = useState(false);
   const [error, setError]         = useState("");
   const [success, setSuccess]     = useState("");
+  const successTimer = useRef(null);
   const [search, setSearch]       = useState("");
   const [stockFilter, setStockFilter] = useState("all"); // all | low | critical | ok
   const [sortBy, setSortBy]       = useState("name-asc"); // name-asc | name-desc | stock-asc | stock-desc | lead-asc | lead-desc
@@ -86,7 +87,8 @@ export default function Parts() {
       }
       closeForm();
       await load();
-      setTimeout(() => setSuccess(""), 3000);
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(err.message);
     }
@@ -98,7 +100,8 @@ export default function Parts() {
       await api.parts.delete(part.id);
       setSuccess(`"${part.name}" deleted`);
       await load();
-      setTimeout(() => setSuccess(""), 3000);
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(err.message);
     }

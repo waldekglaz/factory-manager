@@ -1,10 +1,9 @@
 "use client";
-import React from "react";
 /**
  * Procurement page
  * Two sections: Suppliers (with parts they supply) and Purchase Orders.
  */
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 import { useRole } from "@/lib/role";
 
@@ -76,6 +75,7 @@ function PurchaseOrdersSection({ role }) {
   const [locations, setLocations] = useState([]);
   const [error,     setError]     = useState("");
   const [success,   setSuccess]   = useState("");
+  const successTimer = useRef(null);
 
   const blank = { supplierId: "", expectedDate: "", notes: "", lines: [] };
   const [form, setForm] = useState(blank);
@@ -137,7 +137,8 @@ function PurchaseOrdersSection({ role }) {
       setShowForm(false);
       setForm(blank);
       await load();
-      setTimeout(() => setSuccess(""), 3000);
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(err.message);
     }
@@ -173,7 +174,8 @@ function PurchaseOrdersSection({ role }) {
       setSuccess(`Delivery recorded — stock updated${lines.length > 1 ? " and affected orders recalculated" : ""}`);
       setReceiving(null);
       await load();
-      setTimeout(() => setSuccess(""), 4000);
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 4000);
     } catch (err) {
       setError(err.message);
     }
@@ -421,6 +423,7 @@ function SuppliersSection() {
   const [linkData,  setLinkData]  = useState({ partId: "", unitCost: "", leadTimeOverride: "", minimumOrderQty: "" });
   const [error,     setError]     = useState("");
   const [success,   setSuccess]   = useState("");
+  const successTimer = useRef(null);
 
   const blank = { name: "", email: "", phone: "", defaultLeadTime: 7, notes: "" };
   const [form, setForm] = useState(blank);
@@ -439,7 +442,7 @@ function SuppliersSection() {
 
   const openCreate = () => { setForm(blank); setEditing(null); setShowForm(true); setError(""); };
   const openEdit   = (s) => {
-    setForm({ name: s.name, email: s.email ?? "", phone: s.phone ?? "", defaultLeadTime: s.defaultLeadTime, notes: s.notes });
+    setForm({ name: s.name, email: s.email ?? "", phone: s.phone ?? "", defaultLeadTime: s.defaultLeadTime, notes: s.notes ?? "" });
     setEditing(s);
     setShowForm(true);
     setError("");
@@ -455,7 +458,7 @@ function SuppliersSection() {
         email:           form.email           || null,
         phone:           form.phone           || null,
         defaultLeadTime: Number(form.defaultLeadTime),
-        notes:           form.notes,
+        notes:           form.notes || null,
       };
       if (editing) {
         await api.suppliers.update(editing.id, payload);
@@ -466,7 +469,8 @@ function SuppliersSection() {
       }
       closeForm();
       await load();
-      setTimeout(() => setSuccess(""), 3000);
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(err.message);
     }

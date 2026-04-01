@@ -6,7 +6,7 @@
  *   productsPerBatch = how many products that amount makes
  *   scrapFactor      = waste padding (0.05 = 5% extra ordered)
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 
 function bomLabel(pp) {
@@ -29,6 +29,7 @@ export default function Products() {
   const [editing, setEditing]     = useState(null);
   const [error, setError]         = useState("");
   const [success, setSuccess]     = useState("");
+  const successTimer = useRef(null);
 
   const blank = { name: "", dailyCapacity: 100, description: "", sellingPrice: "", parts: [], locationStocks: [] };
   const [form, setForm] = useState(blank);
@@ -133,7 +134,8 @@ export default function Products() {
       }
       closeForm();
       await load();
-      setTimeout(() => setSuccess(""), 3000);
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(err.message);
     }
@@ -145,7 +147,8 @@ export default function Products() {
       await api.products.delete(prod.id);
       setSuccess(`"${prod.name}" deleted`);
       await load();
-      setTimeout(() => setSuccess(""), 3000);
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(err.message);
     }

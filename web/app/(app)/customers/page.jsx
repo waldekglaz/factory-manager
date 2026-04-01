@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 import { useRole } from "@/lib/role";
 
@@ -18,6 +18,7 @@ export default function Customers() {
   const [history,   setHistory]   = useState({});   // { customerId: [orders] }
   const [error,     setError]     = useState("");
   const [success,   setSuccess]   = useState("");
+  const successTimer = useRef(null);
 
   const blank = { name: "", email: "", phone: "", address: "", notes: "" };
   const [form, setForm] = useState(blank);
@@ -34,7 +35,7 @@ export default function Customers() {
 
   const openCreate = () => { setForm(blank); setEditing(null); setShowForm(true); setError(""); };
   const openEdit   = (c) => {
-    setForm({ name: c.name, email: c.email ?? "", phone: c.phone ?? "", address: c.address ?? "", notes: c.notes });
+    setForm({ name: c.name, email: c.email ?? "", phone: c.phone ?? "", address: c.address ?? "", notes: c.notes ?? "" });
     setEditing(c);
     setShowForm(true);
     setError("");
@@ -50,7 +51,7 @@ export default function Customers() {
         email:   form.email   || null,
         phone:   form.phone   || null,
         address: form.address || null,
-        notes:   form.notes,
+        notes:   form.notes   || null,
       };
       if (editing) {
         await api.customers.update(editing.id, payload);
@@ -61,7 +62,8 @@ export default function Customers() {
       }
       closeForm();
       await load();
-      setTimeout(() => setSuccess(""), 3000);
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(err.message);
     }
@@ -73,7 +75,8 @@ export default function Customers() {
       await api.customers.delete(c.id);
       setSuccess(`"${c.name}" deleted`);
       await load();
-      setTimeout(() => setSuccess(""), 3000);
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(err.message);
     }
@@ -83,8 +86,13 @@ export default function Customers() {
     if (expanded === c.id) { setExpanded(null); return; }
     setExpanded(c.id);
     if (!history[c.id]) {
-      const orders = await api.customers.orders(c.id);
-      setHistory((h) => ({ ...h, [c.id]: orders }));
+      try {
+        const orders = await api.customers.orders(c.id);
+        setHistory((h) => ({ ...h, [c.id]: orders }));
+      } catch (err) {
+        setError(err.message);
+        setExpanded(null);
+      }
     }
   };
 
@@ -97,7 +105,7 @@ export default function Customers() {
           <div className="page-title">Customers</div>
           <div className="page-subtitle">{customers.length} customers</div>
         </div>
-        {role !== "admin" && (
+        {role === "manager" && (
           <button className="btn btn-primary" onClick={openCreate}>+ New Customer</button>
         )}
       </div>
@@ -174,7 +182,7 @@ export default function Customers() {
                       </button>
                     </td>
                     <td>
-                      {role !== "admin" && (
+                      {role === "manager" && (
                         <div className="gap-2">
                           <button className="btn btn-ghost btn-sm" onClick={() => openEdit(c)}>Edit</button>
                           <button className="btn btn-danger btn-sm" onClick={() => handleDelete(c)}>Delete</button>
