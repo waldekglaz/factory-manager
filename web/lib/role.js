@@ -10,7 +10,7 @@ function getSupabase() {
 }
 
 export function useRole() {
-  const [role, setRole] = useState("manager"); // default while loading
+  const [role, setRole] = useState(null); // null while loading
   useEffect(() => {
     getSupabase()
       .auth.getUser()

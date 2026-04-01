@@ -219,12 +219,7 @@ export default function Locations() {
     }
   }
 
-  // ── collect all parts / products across all locations for transfer dropdowns
-  const allParts = [];
-  const allProducts = [];
-  locations.forEach((loc) => {
-    // We don't have item details here — they come from the selected stock view
-  });
+  // Items for transfer dropdowns come from the selected location's stock view
   const transferItems = selected?.stock
     ? transferType === "parts"
       ? selected.stock.partStocks

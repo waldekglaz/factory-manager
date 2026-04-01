@@ -1,5 +1,4 @@
 "use client";
-import React from "react";
 /**
  * Orders page
  * - Place a new order (triggers the production planning algorithm)
@@ -7,7 +6,7 @@ import React from "react";
  * - Start production, complete, cancel
  * - Print work order / delivery note
  */
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 import { useRole } from "@/lib/role";
 
@@ -48,6 +47,7 @@ export default function Orders() {
   const [error,     setError]     = useState("");
   const [success,   setSuccess]   = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const successTimer = useRef(null);
   const [search,     setSearch]     = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy,     setSortBy]     = useState("newest");
@@ -132,7 +132,8 @@ export default function Orders() {
       setForm(blank);
       setPreview(null);
       await load();
-      setTimeout(() => setSuccess(""), 5000);
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 5000);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -150,7 +151,8 @@ export default function Orders() {
       if (action === "cancel")      await api.orders.cancel(order.id);
       setSuccess(`Order #${order.id} updated`);
       await load();
-      setTimeout(() => setSuccess(""), 3000);
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(err.message);
     }
