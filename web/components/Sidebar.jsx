@@ -55,7 +55,12 @@ export default function Sidebar({ isOpen, onClose }) {
       channel
         .on("presence", { event: "sync" }, () => {
           const state = channel.presenceState();
-          const users = Object.values(state).flat();
+          const seen = new Set();
+          const users = Object.values(state).flat().filter((u) => {
+            if (seen.has(u.email)) return false;
+            seen.add(u.email);
+            return true;
+          });
           setOnlineUsers(users);
         })
         .subscribe(async (status) => {
