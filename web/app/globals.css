@@ -333,3 +333,125 @@ textarea { min-height: 70px; resize: vertical; }
 }
 .part-card-name { font-weight: 600; margin-bottom: 8px; }
 .part-card-row  { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
+
+/* ── Mobile header (hamburger bar) ───────────────────────────────────────── */
+.mobile-header {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 52px;
+  background: #1e293b;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  z-index: 150;
+  border-bottom: 1px solid #334155;
+}
+.mobile-logo {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f1f5f9;
+  letter-spacing: -0.3px;
+}
+.mobile-logo span { color: #60a5fa; }
+
+.hamburger {
+  background: none;
+  border: none;
+  color: #f1f5f9;
+  cursor: pointer;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.hamburger:hover { background: #334155; }
+.hamburger svg  { display: block; }
+
+/* ── Sidebar overlay (mobile only) ──────────────────────────────────────── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 299;
+}
+
+/* ── Sidebar close button (hidden on desktop) ────────────────────────────── */
+.sidebar-close {
+  display: none;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 10px 16px 0;
+  font-size: 20px;
+  align-self: flex-end;
+  line-height: 1;
+}
+.sidebar-close:hover { color: #f1f5f9; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE — mobile (≤ 768px)
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* Show mobile header */
+  .mobile-header { display: flex; }
+
+  /* Show sidebar close button */
+  .sidebar-close { display: block; }
+
+  /* Sidebar: slide off-screen by default, slide in when open */
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 300;
+  }
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 32px rgba(0,0,0,0.35);
+  }
+
+  /* Show overlay when sidebar is open */
+  .sidebar-overlay.visible { display: block; }
+
+  /* Main: no left margin; offset for the fixed mobile header */
+  .main {
+    margin-left: 0;
+    padding-top: 52px;
+  }
+
+  /* Reduce page padding */
+  .page { padding: 16px; }
+
+  /* Page header: allow wrap so the button doesn't get squished */
+  .page-header {
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  /* Form rows: single column */
+  .form-row { grid-template-columns: 1fr; }
+
+  /* Allow horizontal scroll inside cards (for tables) */
+  .card {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Button rows: wrap on small screens */
+  .gap-2 { flex-wrap: wrap; }
+
+  /* Reduce parts-grid columns */
+  .parts-grid { grid-template-columns: 1fr; }
+
+  /* Stat cards: wrap into 2 columns */
+  .stat-row { flex-wrap: wrap; }
+  .stat-row > * { min-width: calc(50% - 6px); }
+
+  /* Gantt: still scrollable, just smaller label */
+  .gantt-label { width: 120px; font-size: 11px; }
+}

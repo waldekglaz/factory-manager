@@ -36,7 +36,7 @@ function getSupabase() {
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
   const pathname = usePathname();
   const router = useRouter();
   const [onlineUsers, setOnlineUsers] = useState([]);
@@ -69,6 +69,7 @@ export default function Sidebar() {
   }, []);
 
   const handleLogout = async () => {
+    onClose?.();
     const supabase = getSupabase();
     await supabase.auth.signOut();
     router.push("/login");
@@ -77,7 +78,8 @@ export default function Sidebar() {
   const nav = role === null ? [] : role === "admin" ? ADMIN_NAV : role === "dispatcher" ? DISPATCHER_NAV : MANAGER_NAV;
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${isOpen ? " sidebar-open" : ""}`}>
+      <button className="sidebar-close" onClick={onClose} aria-label="Close menu">✕</button>
       <div className="sidebar-logo">
         Factory <span>Manager</span>
       </div>
@@ -86,6 +88,7 @@ export default function Sidebar() {
           <Link
             key={to}
             href={to}
+            onClick={onClose}
             className={`nav-link${pathname === to || (to !== "/dashboard" && pathname.startsWith(to)) ? " active" : ""}`}
           >
             <span className="nav-icon">{icon}</span>
